@@ -378,6 +378,277 @@ NEXT_PUBLIC_ENABLE_MOTION_LIBRARY=false
 
 Restart the development server after changing any `NEXT_PUBLIC_*` variable.
 
+## Debug Guide
+
+The debug interface is intended for developers and avatar authors. It is deliberately hidden in a
+normal deployment so users see a clean scene and cannot accidentally distort the avatar, move the
+camera away from the composition, or overwrite a pose while chatting.
+
+### Enabling Debug Mode
+
+Add the required flags to `.env.local`:
+
+```env
+# Allow orbiting around the avatar.
+NEXT_PUBLIC_ENABLE_CAMERA_ROTATION=true
+
+# Limit zoom relative to the default camera distance. Valid range: 1.05-3.
+NEXT_PUBLIC_CAMERA_ZOOM_RATIO=1.6
+
+# Allow camera panning.
+NEXT_PUBLIC_ENABLE_CAMERA_PAN=true
+
+# Show bone selection, IK points, rotation controls, and character movement.
+NEXT_PUBLIC_ENABLE_POSE_DEBUG=true
+
+# Show the built-in and custom pose library.
+NEXT_PUBLIC_ENABLE_MOTION_LIBRARY=true
+```
+
+Restart `npm run dev` after changing these variables. They are compiled into the client bundle, so
+refreshing the page without restarting the development server may not apply the new values.
+
+Each switch is independent:
+
+| Variable | Effect |
+| --- | --- |
+| `NEXT_PUBLIC_ENABLE_CAMERA_ROTATION` | Enables left-drag orbit rotation and one-finger touch rotation. |
+| `NEXT_PUBLIC_CAMERA_ZOOM_RATIO` | Sets both the nearest and farthest camera distance around the initial distance. Values are clamped to `1.05-3`. |
+| `NEXT_PUBLIC_ENABLE_CAMERA_PAN` | Enables right-drag panning. If rotation is disabled, left drag also pans. |
+| `NEXT_PUBLIC_ENABLE_POSE_DEBUG` | Adds the Pose Debugger button and exposes bone handles, IK dragging, rotation gizmos, and character translation. |
+| `NEXT_PUBLIC_ENABLE_MOTION_LIBRARY` | Adds the Motion Library button for previewing, saving, and deleting pose presets. |
+
+For pose work, enable both pose debugging and the motion library. Camera rotation is helpful for
+checking the silhouette from multiple angles, while camera panning should remain off unless the
+composition itself is being adjusted.
+
+### Debug Toolbar
+
+When enabled, debug buttons appear in the upper-left corner of the scene:
+
+| Button | Availability | Function |
+| --- | --- | --- |
+| **Bone / Pose Debugger** | Pose debug enabled | Opens the bone editor and displays the avatar skeleton controls. |
+| **Move Character** | Pose Debugger open | Switches the transform gizmo from rotating one bone to translating the complete avatar. |
+| **Reset Character Position** | Move Character active | Restores the avatar root position to `[0, 0, 0]`. |
+| **Motion Library** | Motion library enabled | Opens built-in reference poses and browser-local custom poses. |
+
+The Pose Debugger and Motion Library can be open at the same time. This is useful for applying a
+reference pose, selecting a problem bone, correcting it, and saving the result without leaving the
+scene.
+
+### Selecting Bones
+
+Opening the Pose Debugger displays control points over the normalized VRM skeleton.
+
+- **Cyan point:** an available bone that is not currently selected.
+- **Yellow point:** the currently selected bone.
+- **Smaller points:** fingers, eyes, and jaw use smaller handles to reduce visual clutter.
+- **Missing or disabled row:** the loaded VRM does not provide that normalized humanoid bone.
+
+There are three ways to select a bone:
+
+1. Select a cyan control point directly.
+2. Select the visible avatar mesh near the desired joint; the editor chooses the nearest available
+   bone.
+3. Select a bone row in the Pose Debugger panel.
+
+The panel displays the normalized VRM bone name and X/Y/Z Euler rotation in degrees. Use the slider
+for broad movement and the number input for exact values. The accepted range is `-180` to `180`
+degrees in `0.5` degree steps.
+
+### IK Dragging And Rotation
+
+The editor provides two complementary adjustment methods.
+
+**Drag a control point for inverse kinematics:**
+
+- The selected endpoint follows the pointer.
+- Up to three connected parent joints are adjusted automatically.
+- The solver runs iteratively and limits each angular step to reduce sudden flips.
+- Dragging an end bone is useful for placing a hand, elbow, foot, or other visible landmark.
+- Dragging the root bone moves the complete avatar instead of solving a parent chain.
+
+**Use the rotation gizmo for local correction:**
+
+- The gizmo rotates only the selected bone in its local coordinate space.
+- Rotation snaps to `0.5` degree increments.
+- Use it after IK to correct wrist roll, elbow direction, shoulder twist, head tilt, or finger
+  orientation.
+
+IK solves position, not artistic intent. A hand may reach the correct location while the elbow
+points backward or the wrist twists unnaturally. Always inspect the pose from the front, side, and
+three-quarter views, then use local rotation for cleanup.
+
+### Moving The Complete Avatar
+
+Select **Move Character** while the Pose Debugger is open to display a world-space translation
+gizmo on the avatar root.
+
+- Drag the red, green, or blue axis to move along one axis.
+- Translation snaps in `0.01` unit steps.
+- Use this to correct floor penetration, chair alignment, framing, or the avatar's relationship to
+  scene props.
+- Select **Reset Character Position** to return the root to `[0, 0, 0]`.
+
+Character translation is runtime state and is not included in a saved bone-pose preset. Record a
+required production offset in code or scene configuration if it must be reproducible for every
+user.
+
+### Understanding The Base Pose
+
+Reference presets are applied as patches. A preset may specify only the head, chest, and arms; all
+other bones inherit their values from the current base pose.
+
+Select **Set Current as Base** when:
+
+- a replacement VRM has a different neutral orientation;
+- the current pose should become the foundation for several variations;
+- applying partial presets causes untouched bones to jump back to an unwanted position.
+
+Changing the base does not create a saved preset. It changes how subsequent reference patches are
+resolved during the current page session.
+
+Use this workflow:
+
+1. Load the target VRM model.
+2. Correct its neutral or starting pose.
+3. Select **Set Current as Base**.
+4. Apply a reference pose.
+5. Refine the result with IK and local bone rotation.
+6. Save the finished pose in the Motion Library.
+
+### Motion Library And Custom Presets
+
+The Motion Library contains built-in static references inspired by VRM/VRMA and Mixamo poses.
+Reference labels describe their source of inspiration; the application does not download or play
+external animation files.
+
+Selecting a preset immediately:
+
+- applies its bone patch to the current base pose;
+- previews its associated avatar expression;
+- marks it as the active preset.
+
+To save a pose:
+
+1. Adjust the skeleton until the result is acceptable.
+2. Open the Motion Library.
+3. Enter a descriptive preset name.
+4. Select **Save**.
+
+Custom presets store the complete normalized bone rotation map and current expression in browser
+`localStorage` under `avatar.customPosePresets.v1`. They are available only in that browser profile.
+They are not committed to Git, synchronized to another device, or bundled for another user.
+
+The project currently looks for a custom preset named `默认姿势3` at startup. If that preset exists
+in the browser, it becomes the initial pose. If it does not exist, Nora safely falls back to the
+built-in Default Welcome pose.
+
+Use the **X** on a custom preset to delete it. Built-in presets cannot be deleted.
+
+### Copying A Pose Into Source Control
+
+Select **Copy JSON** in the Pose Debugger to copy the complete pose map. The output contains one
+X/Y/Z rotation object for every normalized VRM humanoid bone.
+
+This is the preferred way to turn a browser-only experiment into a reproducible project default:
+
+1. Copy the pose JSON.
+2. Review the values and remove accidental extreme rotations.
+3. Add the required values to `lib/avatar/deskPose.ts` or create a built-in preset in
+   `lib/avatar/referenceLibrary.ts`.
+4. Give the preset a stable ID and English/Chinese labels.
+5. Run `npm run typecheck` and `npm run build`.
+6. Test the pose with every supported VRM model, because normalized bones can still have different
+   proportions and rest orientations.
+
+Avoid committing a pose by relying only on browser `localStorage`; other users and CI builds cannot
+access it.
+
+### Camera Debug Controls
+
+With camera debugging enabled:
+
+- **Mouse wheel / middle-button dolly:** zooms within the configured distance limits.
+- **Left drag:** rotates when rotation is enabled; otherwise pans when only panning is enabled.
+- **Right drag:** pans when panning is enabled.
+- **One-finger touch:** rotates, or pans when rotation is disabled and panning is enabled.
+- **Two-finger touch:** zooms and pans when panning is enabled.
+
+The camera uses damping, so movement settles smoothly after input. Vertical orbit angles are
+limited to prevent the camera from flipping over the scene.
+
+Before publishing, return camera rotation and panning to `false` unless free navigation is part of
+the intended user experience.
+
+### Common Debugging Problems
+
+**The Pose Debugger or Motion Library button does not appear**
+
+- Confirm the matching `NEXT_PUBLIC_*` variable is exactly `true`.
+- Restart the Next.js development server.
+- Confirm `.env.local` is in the project root.
+- Hard-refresh the browser after the server restarts.
+
+**A bone is marked N/A**
+
+- The selected model does not expose that normalized VRM humanoid bone.
+- Check the humanoid mapping in the VRM authoring tool.
+- Finger, eye, jaw, and upper-chest bones are commonly optional.
+
+**Dragging a point produces an unnatural pose**
+
+- Move the endpoint in smaller steps.
+- Rotate the elbow, shoulder, wrist, or knee locally after IK.
+- Inspect the result from another camera angle.
+- Reset to a known preset and try again if a chain has folded over itself.
+
+**Applying a preset moves unrelated bones**
+
+- Restore or correct the intended neutral pose.
+- Select **Set Current as Base** before applying the partial preset.
+- Check whether a previous custom pose contains extreme values for bones that are not visually
+  obvious from the front.
+
+**The avatar intersects the floor, chair, or scene props**
+
+- Use **Move Character** for temporary alignment.
+- Correct the avatar root or scene placement in source code for a permanent fix.
+- Check the pose from the side before changing the model scale.
+
+**A saved pose is missing on another browser or computer**
+
+- Custom presets are stored only in local browser storage.
+- Use **Copy JSON** and add the pose to the source library when it must be shared.
+
+**The camera is too close, too far away, or cannot move**
+
+- Adjust `NEXT_PUBLIC_CAMERA_ZOOM_RATIO` within `1.05-3`.
+- Enable the specific rotation or panning flag required for the test.
+- Restart the development server after editing `.env.local`.
+
+### Returning To Production Mode
+
+After debugging, restore the normal configuration:
+
+```env
+NEXT_PUBLIC_ENABLE_CAMERA_ROTATION=false
+NEXT_PUBLIC_CAMERA_ZOOM_RATIO=1.6
+NEXT_PUBLIC_ENABLE_CAMERA_PAN=false
+NEXT_PUBLIC_ENABLE_POSE_DEBUG=false
+NEXT_PUBLIC_ENABLE_MOTION_LIBRARY=false
+```
+
+Then restart the server and verify:
+
+1. Debug buttons and skeleton handles are hidden.
+2. The avatar starts in the intended production pose.
+3. Zoom remains bounded.
+4. Rotation and panning are disabled.
+5. The avatar does not intersect the scene from the locked production camera.
+6. Dialogue, expressions, voice playback, and lip sync still work after pose changes.
+
 ## Voice Support
 
 - Speech recognition uses the browser Web Speech API.
