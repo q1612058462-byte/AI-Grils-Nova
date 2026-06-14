@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AvatarStage from "@/components/AvatarStage";
-import StatusBadge from "@/components/StatusBadge";
-import TranscriptPanel from "@/components/TranscriptPanel";
 import { deriveExpressionFromText } from "@/lib/avatar/expressionMapper";
 import { startFakeLipSync } from "@/lib/avatar/lipSync";
 import {
@@ -15,24 +13,63 @@ import {
   type BrowserVoiceOption,
   type BrowserVoiceSettings,
 } from "@/lib/voice/browserSpeech";
-import type { AvatarExpression, AvatarState, TranscriptEntry } from "@/types/avatar";
+import type {
+  AvatarConversation,
+  AvatarExpression,
+  AvatarState,
+  TranscriptEntry,
+} from "@/types/avatar";
 
 const VOICE_OUTPUT_STORAGE_KEY = "avatar.voiceOutputEnabled.v1";
 const VOICE_SETTINGS_STORAGE_KEY = "avatar.voiceSettings.v1";
+const CONVERSATIONS_STORAGE_KEY = "avatar.conversations.v1";
 const DEFAULT_VOICE_SETTINGS: BrowserVoiceSettings = {
   voiceURI: "",
   rate: 0.95,
   pitch: 1.05,
 };
 
+function createConversation(title = "新会话"): AvatarConversation {
+  const now = Date.now();
+  return {
+    id: `${now}-${Math.random().toString(36).slice(2, 9)}`,
+    title,
+    messages: [],
+    dialogueQueue: [],
+    draft: "",
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function isConversation(value: unknown): value is AvatarConversation {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Partial<AvatarConversation>;
+  return (
+    typeof item.id === "string" &&
+    typeof item.title === "string" &&
+    Array.isArray(item.messages) &&
+    Array.isArray(item.dialogueQueue) &&
+    typeof item.draft === "string" &&
+    typeof item.createdAt === "number" &&
+    typeof item.updatedAt === "number"
+  );
+}
+
+function getConversationTitle(prompt: string) {
+  const normalized = prompt.replace(/\s+/g, " ").trim();
+  return normalized.length > 18 ? `${normalized.slice(0, 18)}...` : normalized;
+}
+
 export default function AvatarWorkbench() {
+  const initialConversation = useMemo(() => createConversation(), []);
   const [state, setState] = useState<AvatarState>("idle");
   const [expression, setExpression] = useState<AvatarExpression>("comfort");
   const [mouthOpen, setMouthOpen] = useState(0);
-  const [messages, setMessages] = useState<TranscriptEntry[]>([]);
-  const [dialogueQueue, setDialogueQueue] = useState<string[]>([]);
+  const [sessions, setSessions] = useState<AvatarConversation[]>([initialConversation]);
+  const [activeSessionId, setActiveSessionId] = useState(initialConversation.id);
+  const [sessionsHydrated, setSessionsHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [modelInput, setModelInput] = useState("");
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [voiceInputSupported, setVoiceInputSupported] = useState(false);
   const [voiceInputActive, setVoiceInputActive] = useState(false);
@@ -48,6 +85,20 @@ export default function AvatarWorkbench() {
   const nextId = useMemo(() => {
     let counter = 0;
     return () => `${Date.now()}-${counter += 1}`;
+  }, []);
+
+  const activeSession = useMemo(
+    () => sessions.find((session) => session.id === activeSessionId) ?? sessions[0] ?? initialConversation,
+    [activeSessionId, initialConversation, sessions]
+  );
+
+  const updateSession = useCallback((
+    id: string,
+    updater: (session: AvatarConversation) => AvatarConversation
+  ) => {
+    setSessions((current) =>
+      current.map((session) => session.id === id ? updater(session) : session)
+    );
   }, []);
 
   const stopLipSync = useCallback(() => {
@@ -75,6 +126,30 @@ export default function AvatarWorkbench() {
   }, [stopLipSync]);
 
   useEffect(() => {
+    const storedSessions = window.localStorage.getItem(CONVERSATIONS_STORAGE_KEY);
+    if (storedSessions) {
+      try {
+        const parsed = JSON.parse(storedSessions) as {
+          sessions?: unknown;
+          activeSessionId?: unknown;
+        };
+        const restored = Array.isArray(parsed.sessions)
+          ? parsed.sessions.filter(isConversation)
+          : [];
+        if (restored.length > 0) {
+          setSessions(restored);
+          const restoredActiveId = typeof parsed.activeSessionId === "string" &&
+            restored.some((session) => session.id === parsed.activeSessionId)
+            ? parsed.activeSessionId
+            : restored[0].id;
+          setActiveSessionId(restoredActiveId);
+        }
+      } catch {
+        window.localStorage.removeItem(CONVERSATIONS_STORAGE_KEY);
+      }
+    }
+    setSessionsHydrated(true);
+
     setVoiceInputSupported(supportsBrowserSpeechRecognition());
     const storedVoiceOutput = window.localStorage.getItem(VOICE_OUTPUT_STORAGE_KEY);
     if (storedVoiceOutput === "false") setVoiceOutputEnabled(false);
@@ -105,24 +180,77 @@ export default function AvatarWorkbench() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!sessionsHydrated) return;
+    window.localStorage.setItem(CONVERSATIONS_STORAGE_KEY, JSON.stringify({
+      sessions,
+      activeSessionId,
+    }));
+  }, [activeSessionId, sessions, sessionsHydrated]);
+
   const activeDialogue = useMemo(
-    () => messages.find((entry) => entry.id === dialogueQueue[0]),
-    [dialogueQueue, messages]
+    () => activeSession.messages.find((entry) => entry.id === activeSession.dialogueQueue[0]),
+    [activeSession]
   );
   const previousNoraDialogue = useMemo(
-    () => [...messages].reverse().find(
+    () => [...activeSession.messages].reverse().find(
       (entry) =>
         entry.speaker === "nora" &&
-        entry.id !== dialogueQueue[0] &&
+        entry.id !== activeSession.dialogueQueue[0] &&
         entry.text.trim()
     ),
-    [dialogueQueue, messages]
+    [activeSession]
   );
 
   const dismissActiveDialogue = useCallback(() => {
     cancelSpeech();
-    setDialogueQueue((current) => current.slice(1));
-  }, [cancelSpeech]);
+    updateSession(activeSession.id, (session) => ({
+      ...session,
+      dialogueQueue: session.dialogueQueue.slice(1),
+    }));
+  }, [activeSession.id, cancelSpeech, updateSession]);
+
+  const updateDraft = useCallback((draft: string) => {
+    updateSession(activeSession.id, (session) => ({ ...session, draft }));
+  }, [activeSession.id, updateSession]);
+
+  const createSession = useCallback(() => {
+    if (isModelLoading) return;
+    stopVoiceInput();
+    cancelSpeech();
+    const session = createConversation(`新会话 ${sessions.length + 1}`);
+    setSessions((current) => [...current, session]);
+    setActiveSessionId(session.id);
+    setExpression("comfort");
+    setError(null);
+  }, [cancelSpeech, isModelLoading, sessions.length, stopVoiceInput]);
+
+  const selectSession = useCallback((id: string) => {
+    if (isModelLoading || id === activeSessionId) return;
+    stopVoiceInput();
+    cancelSpeech();
+    setActiveSessionId(id);
+    setExpression("comfort");
+    setError(null);
+  }, [activeSessionId, cancelSpeech, isModelLoading, stopVoiceInput]);
+
+  const renameSession = useCallback((id: string, title: string) => {
+    updateSession(id, (session) => ({
+      ...session,
+      title: title.slice(0, 40),
+      updatedAt: Date.now(),
+    }));
+  }, [updateSession]);
+
+  const deleteSession = useCallback((id: string) => {
+    if (isModelLoading || sessions.length === 1) return;
+    cancelSpeech();
+    setSessions((current) => {
+      const remaining = current.filter((session) => session.id !== id);
+      if (id === activeSessionId) setActiveSessionId(remaining[0].id);
+      return remaining;
+    });
+  }, [activeSessionId, cancelSpeech, isModelLoading, sessions.length]);
 
   const toggleVoiceInput = useCallback(() => {
     if (voiceInputActive) {
@@ -131,11 +259,15 @@ export default function AvatarWorkbench() {
     }
     if (!voiceInputSupported || state !== "idle" || isModelLoading) return;
 
-    const baseInput = modelInput.trim();
+    const sessionId = activeSession.id;
+    const baseInput = activeSession.draft.trim();
     const recognition = createBrowserSpeechRecognition({
       onTranscript: (transcript) => {
         const separator = baseInput && transcript ? " " : "";
-        setModelInput(`${baseInput}${separator}${transcript}`);
+        updateSession(sessionId, (session) => ({
+          ...session,
+          draft: `${baseInput}${separator}${transcript}`,
+        }));
       },
       onError: (message) => setError(message),
       onEnd: () => {
@@ -165,10 +297,11 @@ export default function AvatarWorkbench() {
       setError("无法启动语音识别，请检查麦克风权限。");
     }
   }, [
+    activeSession,
     isModelLoading,
-    modelInput,
     state,
     stopVoiceInput,
+    updateSession,
     voiceInputActive,
     voiceInputSupported,
   ]);
@@ -218,13 +351,14 @@ export default function AvatarWorkbench() {
   }, [cancelSpeech, stopLipSync, voiceSettings]);
 
   const handleModelSubmit = async () => {
-    const prompt = modelInput.trim();
+    const targetSession = activeSession;
+    const prompt = targetSession.draft.trim();
     if (!prompt || isModelLoading || (state !== "idle" && state !== "listening")) return;
 
     stopVoiceInput();
     cancelSpeech();
 
-    const history = messages
+    const history = targetSession.messages
       .filter((entry) => entry.speaker === "user" || entry.speaker === "nora")
       .slice(-20)
       .map((entry) => ({
@@ -234,13 +368,18 @@ export default function AvatarWorkbench() {
 
     const userId = nextId();
     const assistantId = nextId();
-    setMessages((current) => [
-      ...current,
-      { id: userId, speaker: "user", text: prompt },
-      { id: assistantId, speaker: "nora", text: "" },
-    ]);
-    setDialogueQueue([assistantId]);
-    setModelInput("");
+    updateSession(targetSession.id, (session) => ({
+      ...session,
+      title: session.messages.length === 0 ? getConversationTitle(prompt) : session.title,
+      messages: [
+        ...session.messages,
+        { id: userId, speaker: "user", text: prompt },
+        { id: assistantId, speaker: "nora", text: "" },
+      ],
+      dialogueQueue: [assistantId],
+      draft: "",
+      updatedAt: Date.now(),
+    }));
     setError(null);
     setIsModelLoading(true);
     setState("thinking");
@@ -291,25 +430,30 @@ export default function AvatarWorkbench() {
             if (!delta) continue;
 
             reply += delta;
-            setMessages((current) =>
-              current.map((entry) =>
+            updateSession(targetSession.id, (session) => ({
+              ...session,
+              messages: session.messages.map((entry) =>
                 entry.id === assistantId ? { ...entry, text: reply } : entry
-              )
-            );
+              ),
+              updatedAt: Date.now(),
+            }));
             setExpression(deriveExpressionFromText(reply, "comfort"));
           }
         }
       }
 
       if (!reply.trim()) throw new Error("模型返回了空回复。");
-
       setState("idle");
     } catch (requestError) {
       if (controller.signal.aborted) return;
       const message = requestError instanceof Error ? requestError.message : "模型请求失败";
       setError(message);
-      setMessages((current) => current.filter((entry) => entry.id !== assistantId));
-      setDialogueQueue((current) => current.filter((id) => id !== assistantId));
+      updateSession(targetSession.id, (session) => ({
+        ...session,
+        messages: session.messages.filter((entry) => entry.id !== assistantId),
+        dialogueQueue: session.dialogueQueue.filter((id) => id !== assistantId),
+        updatedAt: Date.now(),
+      }));
       setState("idle");
     } finally {
       if (!controller.signal.aborted) {
@@ -322,63 +466,49 @@ export default function AvatarWorkbench() {
   const inputDisabled = isModelLoading || (state !== "idle" && state !== "listening");
 
   return (
-    <main className="relative min-h-screen overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.14),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.12),_transparent_30%),linear-gradient(180deg,#020617_0%,#020617_50%,#010409_100%)]" />
-      <div className="absolute inset-0 opacity-50 [background-image:linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] [background-size:56px_56px]" />
+    <main className="relative h-dvh w-full overflow-hidden bg-slate-950">
+      <AvatarStage
+        state={state}
+        mouthOpen={mouthOpen}
+        expression={expression}
+        dialogue={activeDialogue}
+        previousDialogue={previousNoraDialogue}
+        onDismissDialogue={dismissActiveDialogue}
+        modelInput={activeSession.draft}
+        modelInputDisabled={inputDisabled}
+        modelLoading={isModelLoading}
+        voiceInputSupported={voiceInputSupported}
+        voiceInputActive={voiceInputActive}
+        voiceOutputEnabled={voiceOutputEnabled}
+        voices={voices}
+        voiceSettings={voiceSettings}
+        onModelInputChange={updateDraft}
+        onModelSubmit={() => {
+          void handleModelSubmit();
+        }}
+        onToggleVoiceInput={toggleVoiceInput}
+        onToggleVoiceOutput={toggleVoiceOutput}
+        onVoiceSettingsChange={updateVoiceSettings}
+        onSpeakSentence={speakSentence}
+        onStopSpeech={cancelSpeech}
+        sessions={sessions}
+        activeSession={activeSession}
+        sessionBusy={isModelLoading}
+        onCreateSession={createSession}
+        onSelectSession={selectSession}
+        onRenameSession={renameSession}
+        onDeleteSession={deleteSession}
+      />
 
-      <div className="relative mx-auto flex min-h-screen max-w-[1600px] flex-col px-4 py-4 sm:px-6 lg:px-8">
-        <header className="flex flex-col gap-3 pb-4 pt-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.34em] text-cyan-300/75">Avatar MVP</p>
-            <h1 className="mt-2 font-[family-name:var(--font-display)] text-3xl text-white sm:text-4xl">
-              Nora - AI Digital Human MVP
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-              支持通用 OpenAI 兼容模型、场景字幕、浏览器语音输入与回复朗读。
-            </p>
-          </div>
-          <StatusBadge state={state} />
-        </header>
-
-        <div className="grid flex-1 gap-4 lg:grid-cols-[minmax(0,1.4fr)_420px]">
-          <div className="flex min-h-[70vh] flex-col gap-4">
-            <AvatarStage
-              state={state}
-              mouthOpen={mouthOpen}
-              expression={expression}
-              dialogue={activeDialogue}
-              previousDialogue={previousNoraDialogue}
-              onDismissDialogue={dismissActiveDialogue}
-              modelInput={modelInput}
-              modelInputDisabled={inputDisabled}
-              modelLoading={isModelLoading}
-              voiceInputSupported={voiceInputSupported}
-              voiceInputActive={voiceInputActive}
-              voiceOutputEnabled={voiceOutputEnabled}
-              voices={voices}
-              voiceSettings={voiceSettings}
-              onModelInputChange={setModelInput}
-              onModelSubmit={() => {
-                void handleModelSubmit();
-              }}
-              onToggleVoiceInput={toggleVoiceInput}
-              onToggleVoiceOutput={toggleVoiceOutput}
-              onVoiceSettingsChange={updateVoiceSettings}
-              onSpeakSentence={speakSentence}
-              onStopSpeech={cancelSpeech}
-            />
-
-            {error ? (
-              <div className="rounded-2xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                <strong className="mr-2">提示</strong>
-                {error}
-              </div>
-            ) : null}
-          </div>
-
-          <TranscriptPanel messages={messages} />
-        </div>
-      </div>
+      {error ? (
+        <button
+          type="button"
+          onClick={() => setError(null)}
+          className="absolute bottom-4 left-1/2 z-[60] max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-2xl border border-amber-300/25 bg-slate-950/90 px-4 py-3 text-left text-sm text-amber-100 shadow-2xl backdrop-blur"
+        >
+          {error}
+        </button>
+      ) : null}
     </main>
   );
 }

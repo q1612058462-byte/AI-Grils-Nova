@@ -1317,7 +1317,7 @@ export default function AvatarFace({ state, expression, mouthOpen, speaking }: A
   }, []);
 
   return (
-    <div className="relative h-[680px] w-full overflow-hidden rounded-[2rem] border border-white/10 bg-[#bba995]">
+    <div className="relative h-full w-full overflow-hidden bg-[#bba995]">
       <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.05)_48%,transparent_100%)]" />
       <div className="absolute left-4 top-4 z-30 flex gap-2">
         {canShowPoseDebug && (
@@ -1381,10 +1381,6 @@ export default function AvatarFace({ state, expression, mouthOpen, speaking }: A
           onDelete={deleteCustomPose}
         />
       )}
-      <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full border border-white/10 bg-slate-950/65 px-3 py-1.5 text-[10px] text-slate-300 backdrop-blur">
-        拖动画面旋转镜头 · 滚轮缩放 · 右键拖动平移视角
-      </div>
-
       <Canvas
         shadows
         dpr={[1.25, 2]}

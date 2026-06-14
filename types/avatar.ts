@@ -17,3 +17,13 @@ export type TranscriptEntry = {
 };
 
 export type SceneDialogueEntry = Pick<TranscriptEntry, "id" | "speaker" | "text">;
+
+export type AvatarConversation = {
+  id: string;
+  title: string;
+  messages: TranscriptEntry[];
+  dialogueQueue: string[];
+  draft: string;
+  createdAt: number;
+  updatedAt: number;
+};

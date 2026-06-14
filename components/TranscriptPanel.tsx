@@ -22,7 +22,27 @@ function TranscriptBubble({ entry }: { entry: TranscriptEntry }) {
   );
 }
 
-export default function TranscriptPanel({ messages }: { messages: TranscriptEntry[] }) {
+export default function TranscriptPanel({
+  messages,
+  embedded = false,
+}: {
+  messages: TranscriptEntry[];
+  embedded?: boolean;
+}) {
+  if (embedded) {
+    return (
+      <div className="space-y-3">
+        {messages.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-slate-400">
+            这个会话还没有对话记录。
+          </div>
+        ) : (
+          messages.map((entry) => <TranscriptBubble key={entry.id} entry={entry} />)
+        )}
+      </div>
+    );
+  }
+
   return (
     <aside className="flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-950/70 p-4 shadow-glow backdrop-blur">
       <div className="mb-4 flex items-center justify-between">

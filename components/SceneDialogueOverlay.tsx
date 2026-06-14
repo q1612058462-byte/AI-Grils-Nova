@@ -272,7 +272,7 @@ export default function SceneDialogueOverlay({
   return (
     <div className="pointer-events-none absolute inset-0 z-20">
       {previousDialoguePanel}
-      <div className="pointer-events-auto absolute right-4 top-4 flex gap-1 rounded-xl border border-white/10 bg-slate-950/75 p-1 text-[10px] text-slate-300 backdrop-blur">
+      <div className="pointer-events-auto absolute right-4 top-16 flex gap-1 rounded-xl border border-white/10 bg-slate-950/75 p-1 text-[10px] text-slate-300 backdrop-blur">
         <button
           type="button"
           onClick={onToggleVoiceOutput}
@@ -304,7 +304,7 @@ export default function SceneDialogueOverlay({
       </div>
 
       {showVoiceSettings ? (
-        <div className="pointer-events-auto absolute right-4 top-16 z-30 w-[min(320px,calc(100%-2rem))]">
+        <div className="pointer-events-auto absolute right-4 top-28 z-30 w-[min(320px,calc(100%-2rem))]">
           <VoiceSettingsPanel
             voices={voices}
             settings={voiceSettings}
