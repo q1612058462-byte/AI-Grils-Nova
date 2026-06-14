@@ -21,7 +21,33 @@ export const DEFAULT_STANDING_POSE = Object.fromEntries(
   POSE_DEBUG_BONES.map((bone) => [bone, rotation()])
 ) as DeskPose;
 
-export const DEFAULT_DESK_POSE = DEFAULT_STANDING_POSE;
+export const DEFAULT_WELCOME_POSE: DeskPose = {
+  ...DEFAULT_STANDING_POSE,
+  [VRMHumanBoneName.Chest]: rotation(1.5, 0, 0),
+  [VRMHumanBoneName.Head]: rotation(2, 0, 3),
+  [VRMHumanBoneName.LeftUpperArm]: rotation(-18, -2, 52),
+  [VRMHumanBoneName.LeftLowerArm]: rotation(
+    -4.316563218977278,
+    -63.50916244601928,
+    -1.3978374629375971
+  ),
+  [VRMHumanBoneName.LeftHand]: rotation(-49, 0, 0),
+  [VRMHumanBoneName.RightUpperArm]: rotation(-18, 2, -52),
+  [VRMHumanBoneName.RightLowerArm]: rotation(
+    -12.042904223652188,
+    63.22536703410017,
+    0.4382187782872799
+  ),
+  [VRMHumanBoneName.RightHand]: rotation(
+    -44.349006344792166,
+    0.35804361447649585,
+    20
+  ),
+  [VRMHumanBoneName.LeftThumbMetacarpal]: rotation(-9, 0, 0),
+  [VRMHumanBoneName.RightThumbMetacarpal]: rotation(-3.0000000000000018, 0, 0),
+};
+
+export const DEFAULT_DESK_POSE = DEFAULT_WELCOME_POSE;
 
 export const BONE_LABELS_ZH: Record<PoseDebugBoneName, string> = {
   [VRMHumanBoneName.Hips]: "髋部",

@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import TranscriptPanel from "@/components/TranscriptPanel";
 import {
   AVATAR_PRESETS,
   SCENE_PRESETS,
   type ScenePresetId,
 } from "@/lib/avatar/appearanceLibrary";
+import type { ModelApiSettings } from "@/lib/model/modelApiSettings";
 import type { AvatarConversation, AvatarState } from "@/types/avatar";
 
-type Panel = "appearance" | "sessions" | "history" | "about" | null;
+type Panel = "appearance" | "settings" | "sessions" | "history" | "about" | null;
 
 type SceneControlDockProps = {
   state: AvatarState;
@@ -24,6 +25,8 @@ type SceneControlDockProps = {
   avatarModelUrl: string;
   onScenePresetChange: (id: ScenePresetId) => void;
   onAvatarModelChange: (url: string) => void;
+  modelApiSettings: ModelApiSettings;
+  onModelApiSettingsChange: (settings: ModelApiSettings) => void;
 };
 
 const stateLabels: Record<AvatarState, string> = {
@@ -46,6 +49,8 @@ export default function SceneControlDock({
   avatarModelUrl,
   onScenePresetChange,
   onAvatarModelChange,
+  modelApiSettings,
+  onModelApiSettingsChange,
 }: SceneControlDockProps) {
   const [panel, setPanel] = useState<Panel>(null);
 
@@ -60,6 +65,9 @@ export default function SceneControlDock({
         </div>
         <DockButton label="场景与角色" onClick={() => setPanel("appearance")}>
           <AppearanceIcon />
+        </DockButton>
+        <DockButton label="设置" onClick={() => setPanel("settings")}>
+          <SettingsIcon />
         </DockButton>
         <DockButton label="会话" onClick={() => setPanel("sessions")}>
           <ChatIcon />
@@ -85,6 +93,8 @@ export default function SceneControlDock({
                 <h2 className="font-medium text-white">
                   {panel === "appearance"
                     ? "场景与角色"
+                    : panel === "settings"
+                      ? "设置"
                     : panel === "sessions"
                       ? "会话管理"
                       : panel === "history"
@@ -94,6 +104,8 @@ export default function SceneControlDock({
                 <p className="mt-1 text-xs text-slate-400">
                   {panel === "appearance"
                     ? "选择场景风格或切换 VRM 角色。"
+                    : panel === "settings"
+                      ? "配置模型 API 与生成参数。"
                     : panel === "sessions"
                     ? "每个会话拥有独立上下文和字幕记录。"
                     : panel === "history"
@@ -119,6 +131,11 @@ export default function SceneControlDock({
                   onScenePresetChange={onScenePresetChange}
                   onAvatarModelChange={onAvatarModelChange}
                 />
+              ) : panel === "settings" ? (
+                <ModelSettingsPanel
+                  settings={modelApiSettings}
+                  onSave={onModelApiSettingsChange}
+                />
               ) : panel === "sessions" ? (
                 <SessionManager
                   sessions={sessions}
@@ -142,6 +159,131 @@ export default function SceneControlDock({
         </div>
       ) : null}
     </>
+  );
+}
+
+function ModelSettingsPanel({
+  settings,
+  onSave,
+}: {
+  settings: ModelApiSettings;
+  onSave: (settings: ModelApiSettings) => void;
+}) {
+  const [draft, setDraft] = useState(settings);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => setDraft(settings), [settings]);
+
+  const update = <Key extends keyof ModelApiSettings>(
+    key: Key,
+    value: ModelApiSettings[Key]
+  ) => {
+    setDraft((current) => ({ ...current, [key]: value }));
+    setSaved(false);
+  };
+
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSave(draft);
+        setSaved(true);
+      }}
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <SettingsField label="Base URL" className="sm:col-span-2">
+          <input
+            value={draft.baseUrl}
+            onChange={(event) => update("baseUrl", event.target.value)}
+            placeholder="留空使用 .env，例如 https://api.deepseek.com"
+            className={inputClassName}
+          />
+        </SettingsField>
+        <SettingsField label="模型名称">
+          <input
+            value={draft.model}
+            onChange={(event) => update("model", event.target.value)}
+            placeholder="留空使用 .env"
+            className={inputClassName}
+          />
+        </SettingsField>
+        <SettingsField label="API Key">
+          <input
+            type="password"
+            value={draft.apiKey}
+            onChange={(event) => update("apiKey", event.target.value)}
+            placeholder="留空使用服务端密钥"
+            autoComplete="off"
+            className={inputClassName}
+          />
+        </SettingsField>
+        <SettingsField label={`Temperature · ${draft.temperature.toFixed(2)}`}>
+          <input
+            type="range"
+            min="0"
+            max="2"
+            step="0.05"
+            value={draft.temperature}
+            onChange={(event) => update("temperature", Number(event.target.value))}
+            className="w-full accent-cyan-400"
+          />
+        </SettingsField>
+        <SettingsField label={`Top P · ${draft.topP.toFixed(2)}`}>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={draft.topP}
+            onChange={(event) => update("topP", Number(event.target.value))}
+            className="w-full accent-cyan-400"
+          />
+        </SettingsField>
+        <SettingsField label="最大输出 Tokens">
+          <input
+            type="number"
+            min="1"
+            max="8192"
+            value={draft.maxTokens}
+            onChange={(event) => update("maxTokens", Number(event.target.value))}
+            className={inputClassName}
+          />
+        </SettingsField>
+      </div>
+      <div className="rounded-2xl border border-amber-300/10 bg-amber-300/5 px-4 py-3 text-xs leading-5 text-amber-100/70">
+        页面填写的 API Key 仅保存在当前浏览器的 localStorage。公共设备上建议使用服务端 `.env`。
+      </div>
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          title="保存模型设置"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-cyan-300/25 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20"
+        >
+          {saved ? <CheckIcon /> : <SaveIcon />}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+const inputClassName =
+  "w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-300/40";
+
+function SettingsField({
+  label,
+  className = "",
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className={className}>
+      <span className="mb-2 block text-xs text-slate-400">{label}</span>
+      {children}
+    </label>
   );
 }
 
@@ -261,9 +403,10 @@ function SessionManager({
         type="button"
         onClick={onCreate}
         disabled={busy}
-        className="mb-4 w-full rounded-2xl border border-cyan-300/25 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100 hover:bg-cyan-400/20 disabled:opacity-40"
+        title="新建会话"
+        className="mb-4 flex h-11 w-11 items-center justify-center rounded-full border border-cyan-300/25 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20 disabled:opacity-40"
       >
-        + 新建会话
+        <PlusIcon />
       </button>
       <div className="space-y-2">
         {[...sessions].sort((a, b) => b.updatedAt - a.updatedAt).map((session) => {
@@ -296,9 +439,10 @@ function SessionManager({
                     const title = window.prompt("会话名称", session.title)?.trim();
                     if (title) onRename(session.id, title);
                   }}
-                  className="rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-white/10 hover:text-white disabled:opacity-40"
+                  title="重命名"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-white/10 hover:text-white disabled:opacity-40"
                 >
-                  重命名
+                  <EditIcon />
                 </button>
                 <button
                   type="button"
@@ -306,9 +450,10 @@ function SessionManager({
                   onClick={() => {
                     if (window.confirm(`删除会话“${session.title}”？`)) onDelete(session.id);
                   }}
-                  className="rounded-lg px-2 py-1 text-xs text-rose-300 hover:bg-rose-400/10 disabled:opacity-30"
+                  title="删除"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-rose-300 hover:bg-rose-400/10 disabled:opacity-30"
                 >
-                  删除
+                  <TrashIcon />
                 </button>
               </div>
             </div>
@@ -375,6 +520,30 @@ function ChatIcon() {
 
 function AppearanceIcon() {
   return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 5h16v14H4z" /><path d="m4 15 4-4 3 3 3-4 6 6M16.5 8h.01" /></svg>;
+}
+
+function SettingsIcon() {
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.1A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.1A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.14.38.35.72.6 1 .3.3.7.4 1.1.4h.1v4h-.1c-.4 0-.8.1-1.1.4-.25.28-.46.62-.6 1Z" /></svg>;
+}
+
+function PlusIcon() {
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>;
+}
+
+function EditIcon() {
+  return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m4 16-.5 4.5L8 20l11-11-4-4L4 16Z" /><path d="m13.5 6.5 4 4" /></svg>;
+}
+
+function TrashIcon() {
+  return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></svg>;
+}
+
+function SaveIcon() {
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 4h12l2 2v14H5V4Z" /><path d="M8 4v6h8V4M8 20v-6h8v6" /></svg>;
+}
+
+function CheckIcon() {
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="m5 12 4 4L19 6" /></svg>;
 }
 
 function HistoryIcon() {

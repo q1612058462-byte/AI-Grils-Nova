@@ -9,6 +9,11 @@ import {
   type ScenePresetId,
 } from "@/lib/avatar/appearanceLibrary";
 import {
+  DEFAULT_MODEL_API_SETTINGS,
+  normalizeModelApiSettings,
+  type ModelApiSettings,
+} from "@/lib/model/modelApiSettings";
+import {
   createBrowserSpeechRecognition,
   getBrowserVoices,
   speakWithBrowser,
@@ -28,6 +33,7 @@ const VOICE_OUTPUT_STORAGE_KEY = "avatar.voiceOutputEnabled.v1";
 const VOICE_SETTINGS_STORAGE_KEY = "avatar.voiceSettings.v1";
 const CONVERSATIONS_STORAGE_KEY = "avatar.conversations.v1";
 const APPEARANCE_STORAGE_KEY = "avatar.appearance.v1";
+const MODEL_API_SETTINGS_STORAGE_KEY = "avatar.modelApiSettings.v1";
 const DEFAULT_VOICE_SETTINGS: BrowserVoiceSettings = {
   voiceURI: "",
   rate: 0.95,
@@ -69,7 +75,7 @@ function getConversationTitle(prompt: string) {
 export default function AvatarWorkbench() {
   const initialConversation = useMemo(() => createConversation(), []);
   const [state, setState] = useState<AvatarState>("idle");
-  const [expression, setExpression] = useState<AvatarExpression>("comfort");
+  const [expression, setExpression] = useState<AvatarExpression>("smile");
   const [mouthOpen, setMouthOpen] = useState(0);
   const [sessions, setSessions] = useState<AvatarConversation[]>([initialConversation]);
   const [activeSessionId, setActiveSessionId] = useState(initialConversation.id);
@@ -83,6 +89,7 @@ export default function AvatarWorkbench() {
   const [voiceSettings, setVoiceSettings] = useState(DEFAULT_VOICE_SETTINGS);
   const [scenePresetId, setScenePresetId] = useState<ScenePresetId>("cc0-lounge");
   const [avatarModelUrl, setAvatarModelUrl] = useState(AVATAR_PRESETS[0].modelUrl);
+  const [modelApiSettings, setModelApiSettings] = useState(DEFAULT_MODEL_API_SETTINGS);
 
   const lipSyncStopRef = useRef<(() => void) | null>(null);
   const modelAbortRef = useRef<AbortController | null>(null);
@@ -177,6 +184,17 @@ export default function AvatarWorkbench() {
         }
       } catch {
         window.localStorage.removeItem(APPEARANCE_STORAGE_KEY);
+      }
+    }
+
+    const storedModelSettings = window.localStorage.getItem(MODEL_API_SETTINGS_STORAGE_KEY);
+    if (storedModelSettings) {
+      try {
+        setModelApiSettings(
+          normalizeModelApiSettings(JSON.parse(storedModelSettings) as Partial<ModelApiSettings>)
+        );
+      } catch {
+        window.localStorage.removeItem(MODEL_API_SETTINGS_STORAGE_KEY);
       }
     }
 
@@ -425,6 +443,7 @@ export default function AvatarWorkbench() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: [...history, { role: "user", content: prompt }],
+          apiSettings: modelApiSettings,
         }),
         signal: controller.signal,
       });
@@ -510,6 +529,14 @@ export default function AvatarWorkbench() {
       avatarModelUrl: normalized,
     }));
   }, [scenePresetId]);
+  const updateModelApiSettings = useCallback((settings: ModelApiSettings) => {
+    const normalized = normalizeModelApiSettings(settings);
+    setModelApiSettings(normalized);
+    window.localStorage.setItem(
+      MODEL_API_SETTINGS_STORAGE_KEY,
+      JSON.stringify(normalized)
+    );
+  }, []);
 
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-slate-950">
@@ -548,6 +575,8 @@ export default function AvatarWorkbench() {
         avatarModelUrl={avatarModelUrl}
         onScenePresetChange={updateScenePreset}
         onAvatarModelChange={updateAvatarModel}
+        modelApiSettings={modelApiSettings}
+        onModelApiSettingsChange={updateModelApiSettings}
       />
 
       {error ? (

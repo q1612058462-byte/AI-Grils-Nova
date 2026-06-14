@@ -3,6 +3,7 @@ import SceneControlDock from "@/components/SceneControlDock";
 import SceneDialogueOverlay from "@/components/SceneDialogueOverlay";
 import { blendMouthOpen } from "@/lib/avatar/expressionState";
 import type { ScenePresetId } from "@/lib/avatar/appearanceLibrary";
+import type { ModelApiSettings } from "@/lib/model/modelApiSettings";
 import type { BrowserVoiceOption, BrowserVoiceSettings } from "@/lib/voice/browserSpeech";
 import type {
   AvatarConversation,
@@ -44,6 +45,8 @@ type AvatarStageProps = {
   avatarModelUrl: string;
   onScenePresetChange: (id: ScenePresetId) => void;
   onAvatarModelChange: (url: string) => void;
+  modelApiSettings: ModelApiSettings;
+  onModelApiSettingsChange: (settings: ModelApiSettings) => void;
 };
 
 export default function AvatarStage({
@@ -79,6 +82,8 @@ export default function AvatarStage({
   avatarModelUrl,
   onScenePresetChange,
   onAvatarModelChange,
+  modelApiSettings,
+  onModelApiSettingsChange,
 }: AvatarStageProps) {
   const normalizedMouth = blendMouthOpen(state, mouthOpen);
 
@@ -111,6 +116,8 @@ export default function AvatarStage({
           avatarModelUrl={avatarModelUrl}
           onScenePresetChange={onScenePresetChange}
           onAvatarModelChange={onAvatarModelChange}
+          modelApiSettings={modelApiSettings}
+          onModelApiSettingsChange={onModelApiSettingsChange}
         />
         <SceneDialogueOverlay
           dialogue={dialogue}

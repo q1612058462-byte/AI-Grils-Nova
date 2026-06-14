@@ -72,7 +72,7 @@ type BoneNodeEntry = {
 
 const CUSTOM_PRESETS_STORAGE_KEY = "avatar.customPosePresets.v1";
 const DEFAULT_REFERENCE_PRESET =
-  REFERENCE_PRESETS.find((preset) => preset.id === "comfort") ?? REFERENCE_PRESETS[0];
+  REFERENCE_PRESETS.find((preset) => preset.id === "default-welcome") ?? REFERENCE_PRESETS[0];
 
 const expressionToVrmPreset: Record<AvatarExpression, string> = {
   neutral: VRMExpressionPresetName.Neutral,
@@ -1649,7 +1649,10 @@ export default function AvatarFace({
   const [selectedBone, setSelectedBone] = useState<PoseDebugBoneName | null>(VRMHumanBoneName.Hips);
   const [activePresetId, setActivePresetId] = useState(DEFAULT_REFERENCE_PRESET.id);
   const [previewExpression, setPreviewExpression] = useState<AvatarExpression | null>(null);
-  const canShowPoseDebug = process.env.NODE_ENV !== "production";
+  const canRotateCamera = process.env.NEXT_PUBLIC_ENABLE_CAMERA_ROTATION === "true";
+  const canShowPoseDebug = process.env.NEXT_PUBLIC_ENABLE_POSE_DEBUG === "true";
+  const canShowReferenceLibrary =
+    process.env.NEXT_PUBLIC_ENABLE_MOTION_LIBRARY === "true";
   const referencePresets = useMemo(
     () => [...REFERENCE_PRESETS, ...customPresets],
     [customPresets]
@@ -1770,9 +1773,11 @@ export default function AvatarFace({
           <button
             type="button"
             onClick={() => setShowPoseDebug((value) => !value)}
-            className="rounded-xl border border-cyan-300/25 bg-slate-950/85 px-3 py-2 text-xs font-medium text-cyan-100 shadow-lg backdrop-blur hover:bg-slate-900"
+            title="姿势调试"
+            aria-label="姿势调试"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-cyan-300/25 bg-slate-950/85 text-cyan-100 shadow-lg backdrop-blur hover:bg-slate-900"
           >
-            姿势调试 / Pose Debug: {showPoseDebug ? "ON" : "OFF"}
+            <BoneIcon active={showPoseDebug} />
           </button>
         )}
         {canShowPoseDebug && showPoseDebug && (
@@ -1780,33 +1785,41 @@ export default function AvatarFace({
             <button
               type="button"
               onClick={() => setEnableCharacterMove((value) => !value)}
-              className="rounded-xl border border-emerald-300/25 bg-slate-950/85 px-3 py-2 text-xs font-medium text-emerald-100 shadow-lg backdrop-blur hover:bg-slate-900"
+              title="移动人物"
+              aria-label="移动人物"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-300/25 bg-slate-950/85 text-emerald-100 shadow-lg backdrop-blur hover:bg-slate-900"
             >
-              人物移动 / Move: {enableCharacterMove ? "ON" : "OFF"}
+              <MoveIcon active={enableCharacterMove} />
             </button>
             {enableCharacterMove && (
               <button
                 type="button"
                 onClick={() => setCharacterPosition([0, 0, 0])}
-                className="rounded-xl border border-white/15 bg-slate-950/85 px-3 py-2 text-xs text-slate-200 shadow-lg backdrop-blur hover:bg-slate-900"
+                title="复位人物"
+                aria-label="复位人物"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-slate-950/85 text-slate-200 shadow-lg backdrop-blur hover:bg-slate-900"
               >
-                复位人物
+                <ResetIcon />
               </button>
             )}
           </>
         )}
-        <button
-          type="button"
-          onClick={() => {
-            setShowReferenceLibrary((value) => {
-              if (value) setPreviewExpression(null);
-              return !value;
-            });
-          }}
-          className="rounded-xl border border-amber-300/25 bg-slate-950/85 px-3 py-2 text-xs font-medium text-amber-100 shadow-lg backdrop-blur hover:bg-slate-900"
-        >
-          参考动作 / Motion Library: {showReferenceLibrary ? "ON" : "OFF"}
-        </button>
+        {canShowReferenceLibrary ? (
+          <button
+            type="button"
+            onClick={() => {
+              setShowReferenceLibrary((value) => {
+                if (value) setPreviewExpression(null);
+                return !value;
+              });
+            }}
+            title="参考动作"
+            aria-label="参考动作"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-300/25 bg-slate-950/85 text-amber-100 shadow-lg backdrop-blur hover:bg-slate-900"
+          >
+            <MotionIcon active={showReferenceLibrary} />
+          </button>
+        ) : null}
       </div>
       {canShowPoseDebug && showPoseDebug && (
         <PoseDebugPanel
@@ -1881,6 +1894,18 @@ export default function AvatarFace({
           target={[0, 0.46, 0]}
           enableDamping
           dampingFactor={0.08}
+          enableRotate={canRotateCamera}
+          enableZoom
+          enablePan
+          mouseButtons={{
+            LEFT: canRotateCamera ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN,
+            MIDDLE: THREE.MOUSE.DOLLY,
+            RIGHT: THREE.MOUSE.PAN,
+          }}
+          touches={{
+            ONE: canRotateCamera ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN,
+            TWO: THREE.TOUCH.DOLLY_PAN,
+          }}
           minDistance={1.8}
           maxDistance={7}
           minPolarAngle={0.45}
@@ -1925,3 +1950,19 @@ export default function AvatarFace({
 useGLTF.preload("/assets/models/polyhaven/Sofa_01.glb");
 useGLTF.preload("/assets/models/polyhaven/coffee_table_round_01.glb");
 useGLTF.preload("/assets/models/polyhaven/desk_lamp_arm_01.glb");
+
+function BoneIcon({ active }: { active: boolean }) {
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7"><circle cx="6" cy="6" r="2" /><circle cx="18" cy="18" r="2" /><path d="m7.5 7.5 9 9M9 5h6M5 9v6M15 19H9M19 15V9" /></svg>;
+}
+
+function MoveIcon({ active }: { active: boolean }) {
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M21 12l-3-3M21 12l-3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3" /></svg>;
+}
+
+function ResetIcon() {
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 8V4m0 0h4M4 4l4 4a7 7 0 1 1-2 5" /></svg>;
+}
+
+function MotionIcon({ active }: { active: boolean }) {
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7"><circle cx="12" cy="5" r="2" /><path d="m12 7-3 5 3 2 2 7M9 12l-4 3M12 14l5-4 2 3" /></svg>;
+}

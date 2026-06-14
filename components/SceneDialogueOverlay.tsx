@@ -221,20 +221,21 @@ export default function SceneDialogueOverlay({
               disabled={!voiceInputSupported || inputDisabled}
               title={voiceInputSupported ? "语音输入" : "当前浏览器不支持语音识别"}
               className={[
-                "rounded-xl border px-3 py-2.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-35",
+                "flex h-10 w-10 items-center justify-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-35",
                 voiceInputActive
                   ? "animate-pulse border-rose-300/40 bg-rose-400/20 text-rose-100"
                   : "border-cyan-300/25 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20",
               ].join(" ")}
             >
-              {voiceInputActive ? "停止" : "语音"}
+              {voiceInputActive ? <StopIcon /> : <MicrophoneIcon />}
             </button>
             <button
               type="submit"
               disabled={!input.trim() || inputDisabled}
-              className="rounded-xl border border-amber-300/25 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-100 hover:bg-amber-400/20 disabled:cursor-not-allowed disabled:opacity-40"
+              title="发送"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-300/25 bg-amber-400/10 text-amber-100 hover:bg-amber-400/20 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {loading ? "回复中..." : "发送"}
+              {loading ? <LoadingIcon /> : <SendIcon />}
             </button>
           </div>
           <div className="mt-2 flex items-center justify-between gap-3 text-[10px] text-slate-400">
@@ -242,16 +243,18 @@ export default function SceneDialogueOverlay({
             <button
               type="button"
               onClick={onToggleVoiceOutput}
-              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10"
+              title={voiceOutputEnabled ? "关闭回复朗读" : "开启回复朗读"}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 hover:bg-white/10"
             >
-              回复朗读：{voiceOutputEnabled ? "开" : "关"}
+              <SpeakerIcon active={voiceOutputEnabled} />
             </button>
             <button
               type="button"
               onClick={() => setShowVoiceSettings((current) => !current)}
-              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10"
+              title="声音设置"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 hover:bg-white/10"
             >
-              声音设置
+              <SlidersIcon />
             </button>
           </div>
           {showVoiceSettings ? (
@@ -272,34 +275,38 @@ export default function SceneDialogueOverlay({
   return (
     <div className="pointer-events-none absolute inset-0 z-20">
       {previousDialoguePanel}
-      <div className="pointer-events-auto absolute right-4 top-16 flex gap-1 rounded-xl border border-white/10 bg-slate-950/75 p-1 text-[10px] text-slate-300 backdrop-blur">
+      <div className="pointer-events-auto absolute right-4 top-16 flex gap-1 rounded-full border border-white/10 bg-slate-950/75 p-1 text-slate-300 backdrop-blur">
         <button
           type="button"
           onClick={onToggleVoiceOutput}
-          className="rounded-lg px-2 py-1 hover:bg-white/10"
+          title={voiceOutputEnabled ? "关闭声音" : "开启声音"}
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"
         >
-          声音 {voiceOutputEnabled ? "开" : "关"}
+          <SpeakerIcon active={voiceOutputEnabled} />
         </button>
         <button
           type="button"
           onClick={() => setShowVoiceSettings((current) => !current)}
-          className="rounded-lg px-2 py-1 hover:bg-white/10"
+          title="音色设置"
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"
         >
-          音色
+          <SlidersIcon />
         </button>
         <button
           type="button"
           onClick={() => setStyle(displayStyle === "subtitle" ? "bubble" : "subtitle")}
-          className="rounded-lg px-2 py-1 hover:bg-white/10"
+          title={displayStyle === "subtitle" ? "切换为气泡" : "切换为字幕"}
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"
         >
-          {displayStyle === "subtitle" ? "字幕" : "气泡"}
+          {displayStyle === "subtitle" ? <SubtitleIcon /> : <BubbleIcon />}
         </button>
         <button
           type="button"
           onClick={() => setMode(playbackMode === "auto" ? "manual" : "auto")}
-          className="rounded-lg px-2 py-1 hover:bg-white/10"
+          title={playbackMode === "auto" ? "切换为手动" : "切换为自动"}
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"
         >
-          {playbackMode === "auto" ? "自动" : "手动"}
+          {playbackMode === "auto" ? <AutoIcon /> : <ManualIcon />}
         </button>
       </div>
 
@@ -444,4 +451,44 @@ function VoiceSettingsPanel({
       </button>
     </div>
   );
+}
+
+function MicrophoneIcon() {
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6" /></svg>;
+}
+
+function StopIcon() {
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>;
+}
+
+function SendIcon() {
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m4 4 17 8-17 8 3-8-3-8Z" /><path d="M7 12h14" /></svg>;
+}
+
+function LoadingIcon() {
+  return <svg viewBox="0 0 24 24" className="h-5 w-5 animate-spin" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 12a8 8 0 1 1-2.34-5.66" /></svg>;
+}
+
+function SpeakerIcon({ active }: { active: boolean }) {
+  return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 10v4h4l4 4V6L9 10H5Z" />{active ? <path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11" /> : <path d="m17 10 4 4m0-4-4 4" />}</svg>;
+}
+
+function SlidersIcon() {
+  return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M7 14v6" /></svg>;
+}
+
+function SubtitleIcon() {
+  return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M6 14h5M13 14h5M6 17h8" /></svg>;
+}
+
+function BubbleIcon() {
+  return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 5h16v11H9l-5 4V5Z" /></svg>;
+}
+
+function AutoIcon() {
+  return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M8 5v14l11-7L8 5Z" /></svg>;
+}
+
+function ManualIcon() {
+  return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M7 4v16M17 4v16" /></svg>;
 }

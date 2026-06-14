@@ -43,12 +43,12 @@ export function applyReferencePreset(basePose: DeskPose, preset: ReferencePreset
 
 export const REFERENCE_PRESETS: ReferencePreset[] = [
   createPreset(
-    "desk-neutral",
-    "自然站姿",
-    "Natural Standing",
-    "恢复模型归一化骨骼的默认自然站立姿势。",
+    "default-welcome",
+    "默认欢迎",
+    "Default Welcome",
+    "角色进入场景时使用的默认欢迎姿势。",
     "VRM Preset",
-    "neutral",
+    "smile",
     {}
   ),
   createPreset(
