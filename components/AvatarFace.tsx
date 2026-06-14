@@ -1,9 +1,11 @@
 "use client";
 
 import {
+  ContactShadows,
   DragControls,
   Environment,
   Html,
+  MeshReflectorMaterial,
   OrbitControls,
   RoundedBox,
   TransformControls,
@@ -472,6 +474,26 @@ function VRMCharacter({
         loadedVrm.scene.scale.setScalar(1.58);
         loadedVrm.scene.position.set(0, -1.34, 0);
         loadedVrm.scene.rotation.set(0, loadedVrm.meta.metaVersion === "0" ? Math.PI : 0, 0);
+        loadedVrm.scene.traverse((object) => {
+          if (!(object instanceof THREE.Mesh)) return;
+          object.castShadow = true;
+          object.receiveShadow = true;
+
+          const materials = Array.isArray(object.material) ? object.material : [object.material];
+          for (const material of materials) {
+            const texturedMaterial = material as THREE.Material & {
+              map?: THREE.Texture | null;
+              envMapIntensity?: number;
+            };
+            if (texturedMaterial.map) {
+              texturedMaterial.map.anisotropy = 8;
+              texturedMaterial.map.needsUpdate = true;
+            }
+            if ("envMapIntensity" in texturedMaterial) {
+              texturedMaterial.envMapIntensity = 0.72;
+            }
+          }
+        });
 
         onAvailableBonesChange(
           POSE_DEBUG_BONES.filter((bone) => loadedVrm.humanoid.getNormalizedBoneNode(bone) !== null)
@@ -1061,27 +1083,105 @@ function VRMCharacter({
   );
 }
 
+type ProceduralSurface = "wood" | "plaster";
+
+function createProceduralSurfaceTexture(
+  surface: ProceduralSurface,
+  repeat: [number, number]
+) {
+  const size = 128;
+  const data = new Uint8Array(size * size * 4);
+
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const offset = (y * size + x) * 4;
+      const noise = ((x * 17 + y * 43 + x * y * 3) % 29) / 29 - 0.5;
+      const grain = Math.sin(y * 0.38 + Math.sin(x * 0.06) * 2.8) * 0.5 + 0.5;
+      const value = surface === "wood"
+        ? 128 + grain * 62 + noise * 28
+        : 210 + noise * 22 + Math.sin(x * 0.15 + y * 0.08) * 4;
+
+      data[offset] = THREE.MathUtils.clamp(value, 0, 255);
+      data[offset + 1] = THREE.MathUtils.clamp(value * (surface === "wood" ? 0.82 : 0.98), 0, 255);
+      data[offset + 2] = THREE.MathUtils.clamp(value * (surface === "wood" ? 0.64 : 0.94), 0, 255);
+      data[offset + 3] = 255;
+    }
+  }
+
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(repeat[0], repeat[1]);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function useProceduralSurfaceTexture(
+  surface: ProceduralSurface,
+  repeat: [number, number]
+) {
+  const texture = useMemo(
+    () => createProceduralSurfaceTexture(surface, repeat),
+    [repeat[0], repeat[1], surface]
+  );
+
+  useEffect(() => () => texture.dispose(), [texture]);
+  return texture;
+}
+
 function CozyStudyScene() {
+  const wallTexture = useProceduralSurfaceTexture("plaster", [3, 2]);
+  const woodTexture = useProceduralSurfaceTexture("wood", [5, 2]);
+  const floorTexture = useProceduralSurfaceTexture("wood", [7, 5]);
+
   return (
     <group position={[0, 0, -1.15]}>
       <mesh position={[0, 1.15, -0.45]} receiveShadow>
         <boxGeometry args={[7.5, 4.8, 0.12]} />
-        <meshStandardMaterial color="#d9cabb" roughness={0.92} />
+        <meshStandardMaterial map={wallTexture} color="#d9cabb" roughness={0.92} />
       </mesh>
 
       <mesh position={[-3.35, 1.05, 1.35]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
         <boxGeometry args={[3.7, 4.7, 0.12]} />
-        <meshStandardMaterial color="#c8b5a4" roughness={0.95} />
+        <meshStandardMaterial map={wallTexture} color="#c8b5a4" roughness={0.95} />
       </mesh>
 
       <mesh position={[0, -1.55, 1.15]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[7.6, 5.8]} />
-        <meshStandardMaterial color="#7a5c46" roughness={0.86} />
+        <meshStandardMaterial map={floorTexture} color="#8a674d" roughness={0.72} />
+      </mesh>
+
+      <mesh position={[0, -0.92, 0.72]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[3.9, 2.7]} />
+        <meshStandardMaterial color="#6f7d73" roughness={0.96} />
+      </mesh>
+      <mesh position={[0, -0.914, 0.72]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.74, 0.78, 64]} />
+        <meshStandardMaterial color="#d6c3a1" roughness={0.9} />
+      </mesh>
+
+      {[-2.95, -1.48, 0, 1.48, 2.95].map((x) => (
+        <group key={x}>
+          <mesh position={[x, 1.18, -0.375]}>
+            <boxGeometry args={[0.035, 4.65, 0.035]} />
+            <meshStandardMaterial color="#b49f8c" roughness={0.82} />
+          </mesh>
+          <mesh position={[x, -0.58, -0.35]}>
+            <boxGeometry args={[1.38, 0.035, 0.04]} />
+            <meshStandardMaterial color="#b49f8c" roughness={0.82} />
+          </mesh>
+        </group>
+      ))}
+      <mesh position={[0, -1.15, -0.32]}>
+        <boxGeometry args={[7.4, 0.24, 0.11]} />
+        <meshStandardMaterial color="#a78f7b" roughness={0.78} />
       </mesh>
 
       <group position={[1.75, 1.2, -0.34]}>
         <RoundedBox args={[2.2, 1.8, 0.1]} radius={0.04}>
-          <meshStandardMaterial color="#5f4637" roughness={0.72} />
+          <meshStandardMaterial map={woodTexture} color="#6c4c39" roughness={0.62} />
         </RoundedBox>
         <mesh position={[0, 0, 0.065]}>
           <planeGeometry args={[1.92, 1.52]} />
@@ -1103,11 +1203,23 @@ function CozyStudyScene() {
           <boxGeometry args={[0.34, 2.1, 0.08]} />
           <meshStandardMaterial color="#a88472" roughness={0.9} />
         </mesh>
+        <mesh position={[-0.78, 0, 0.17]}>
+          <boxGeometry args={[0.04, 1.52, 0.035]} />
+          <meshStandardMaterial color="#f1e4d5" />
+        </mesh>
+        <mesh position={[0.78, 0, 0.17]}>
+          <boxGeometry args={[0.04, 1.52, 0.035]} />
+          <meshStandardMaterial color="#f1e4d5" />
+        </mesh>
+        <mesh position={[0, -0.52, 0.17]}>
+          <boxGeometry args={[1.92, 0.035, 0.035]} />
+          <meshStandardMaterial color="#f1e4d5" />
+        </mesh>
       </group>
 
       <group position={[-2.25, 0.28, -0.2]}>
         <RoundedBox args={[1.15, 2.75, 0.42]} radius={0.05} castShadow receiveShadow>
-          <meshStandardMaterial color="#584338" roughness={0.82} />
+          <meshStandardMaterial map={woodTexture} color="#584338" roughness={0.72} />
         </RoundedBox>
         {[-0.82, -0.26, 0.3, 0.86].map((y) => (
           <mesh key={y} position={[0, y, 0.25]} castShadow>
@@ -1126,6 +1238,12 @@ function CozyStudyScene() {
           <mesh key={index} position={[Number(x), Number(y), 0.51]} castShadow>
             <boxGeometry args={[0.2, 0.42, 0.12]} />
             <meshStandardMaterial color={String(color)} roughness={0.8} />
+          </mesh>
+        ))}
+        {[-0.42, -0.14, 0.14, 0.42].map((x, index) => (
+          <mesh key={`lower-book-${x}`} position={[x, -0.53, 0.5]} rotation={[0, 0, (index - 1.5) * 0.025]} castShadow>
+            <boxGeometry args={[0.18, 0.45 + (index % 2) * 0.08, 0.13]} />
+            <meshStandardMaterial color={["#8f5549", "#425d66", "#b48d56", "#66734f"][index]} roughness={0.72} />
           </mesh>
         ))}
       </group>
@@ -1157,7 +1275,7 @@ function CozyStudyScene() {
 
       <group position={[0, -0.28, 1.28]}>
         <RoundedBox args={[5.15, 0.16, 1.18]} radius={0.065} castShadow receiveShadow>
-          <meshStandardMaterial color="#684a36" roughness={0.72} />
+          <meshPhysicalMaterial map={woodTexture} color="#765139" roughness={0.58} clearcoat={0.12} clearcoatRoughness={0.7} />
         </RoundedBox>
         <RoundedBox position={[0, -0.3, 0.43]} args={[5.05, 0.46, 0.12]} radius={0.035} castShadow>
           <meshStandardMaterial color="#493226" roughness={0.86} />
@@ -1185,6 +1303,16 @@ function CozyStudyScene() {
           <planeGeometry args={[1.1, 0.5]} />
           <meshStandardMaterial color="#d2c3aa" roughness={0.95} />
         </mesh>
+        <group position={[-0.58, 0.17, -0.05]}>
+          <mesh castShadow>
+            <boxGeometry args={[0.42, 0.035, 0.28]} />
+            <meshStandardMaterial color="#9d7256" roughness={0.8} />
+          </mesh>
+          <mesh position={[0, 0.035, 0]} castShadow>
+            <boxGeometry args={[0.38, 0.03, 0.25]} />
+            <meshStandardMaterial color="#526676" roughness={0.75} />
+          </mesh>
+        </group>
       </group>
 
       <mesh position={[-0.65, 1.05, -0.36]}>
@@ -1195,6 +1323,30 @@ function CozyStudyScene() {
         <circleGeometry args={[0.29, 48]} />
         <meshStandardMaterial color="#6e8791" roughness={0.28} metalness={0.15} />
       </mesh>
+
+      <group position={[2.9, -0.83, -0.05]}>
+        <mesh castShadow>
+          <cylinderGeometry args={[0.28, 0.34, 0.45, 32]} />
+          <meshStandardMaterial color="#6e5141" roughness={0.78} />
+        </mesh>
+        {[-0.24, -0.08, 0.1, 0.25].map((rotation, index) => (
+          <mesh key={rotation} position={[Math.sin(rotation * 4) * 0.16, 0.46 + index * 0.11, 0]} rotation={[0, 0, rotation]}>
+            <sphereGeometry args={[0.24, 24, 16]} />
+            <meshStandardMaterial color={index % 2 ? "#47705b" : "#527c62"} roughness={0.88} />
+          </mesh>
+        ))}
+      </group>
+
+      <group position={[-0.55, 1.88, -0.28]}>
+        <mesh>
+          <boxGeometry args={[1.15, 0.72, 0.06]} />
+          <meshStandardMaterial color="#594638" roughness={0.7} />
+        </mesh>
+        <mesh position={[0, 0, 0.04]}>
+          <planeGeometry args={[1.02, 0.59]} />
+          <meshStandardMaterial color="#74837c" emissive="#384842" emissiveIntensity={0.08} roughness={0.95} />
+        </mesh>
+      </group>
     </group>
   );
 }
@@ -1213,7 +1365,18 @@ function NightLoftScene() {
     <group position={[0, 0, -1.1]}>
       <mesh position={[0, -1.55, 1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[9, 7]} />
-        <meshStandardMaterial color="#151827" roughness={0.34} metalness={0.32} />
+        <MeshReflectorMaterial
+          color="#151827"
+          roughness={0.48}
+          metalness={0.2}
+          resolution={512}
+          blur={[280, 90]}
+          mixBlur={0.75}
+          mixStrength={0.16}
+          depthScale={0.18}
+          minDepthThreshold={0.35}
+          maxDepthThreshold={1.4}
+        />
       </mesh>
       <mesh position={[0, 1.1, -0.8]} receiveShadow>
         <boxGeometry args={[8.8, 5.2, 0.1]} />
@@ -1282,7 +1445,17 @@ function SoftStudioScene() {
       </mesh>
       <mesh position={[0, -1.52, 1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[10, 7]} />
-        <meshStandardMaterial color="#cbc7bf" roughness={0.68} />
+        <MeshReflectorMaterial
+          color="#cbc7bf"
+          roughness={0.72}
+          resolution={512}
+          blur={[220, 80]}
+          mixBlur={0.55}
+          mixStrength={0.1}
+          depthScale={0.12}
+          minDepthThreshold={0.4}
+          maxDepthThreshold={1.5}
+        />
       </mesh>
       <mesh position={[0, -1.1, -0.42]} rotation={[Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[4.7, 4.7, 1.4, 64, 1, true, 0, Math.PI]} />
@@ -1522,7 +1695,10 @@ export default function AvatarFace({
         gl={{ antialias: true, alpha: true }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 0.72;
+          gl.toneMappingExposure = scenePresetId === "night-loft" ? 0.82 : 0.78;
+          gl.outputColorSpace = THREE.SRGBColorSpace;
+          gl.shadowMap.enabled = true;
+          gl.shadowMap.type = THREE.PCFSoftShadowMap;
         }}
       >
         <color
@@ -1562,6 +1738,17 @@ export default function AvatarFace({
           maxPolarAngle={Math.PI - 0.45}
         />
         <SceneEnvironment presetId={scenePresetId} />
+        <ContactShadows
+          key={`${scenePresetId}-${modelUrl}`}
+          position={[0, -1.48, 0.25]}
+          scale={8}
+          opacity={scenePresetId === "night-loft" ? 0.48 : 0.34}
+          blur={2.4}
+          far={4.5}
+          resolution={1024}
+          color={scenePresetId === "night-loft" ? "#050712" : "#3c2c24"}
+          frames={120}
+        />
         <VRMCharacter
           state={state}
           expression={previewExpression ?? expression}
