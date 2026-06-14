@@ -95,7 +95,7 @@ export default function AvatarWorkbench() {
   const [voiceOutputEnabled, setVoiceOutputEnabled] = useState(true);
   const [voices, setVoices] = useState<BrowserVoiceOption[]>([]);
   const [voiceSettings, setVoiceSettings] = useState(DEFAULT_VOICE_SETTINGS);
-  const [scenePresetId, setScenePresetId] = useState<ScenePresetId>("cc0-lounge");
+  const [scenePresetId, setScenePresetId] = useState<ScenePresetId>("sunset-street");
   const [avatarModelUrl, setAvatarModelUrl] = useState(AVATAR_PRESETS[0].modelUrl);
   const [modelApiSettings, setModelApiSettings] = useState(DEFAULT_MODEL_API_SETTINGS);
   const [uiLanguage, setUiLanguage] = useState<UiLanguage>("en");

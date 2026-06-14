@@ -75,6 +75,7 @@ type BoneNodeEntry = {
 };
 
 const CUSTOM_PRESETS_STORAGE_KEY = "avatar.customPosePresets.v1";
+const DEFAULT_CUSTOM_PRESET_NAME = "默认姿势3";
 const DEFAULT_REFERENCE_PRESET =
   REFERENCE_PRESETS.find((preset) => preset.id === "default-welcome") ?? REFERENCE_PRESETS[0];
 
@@ -1676,17 +1677,27 @@ export default function AvatarFace({
       if (stored) {
         const parsed = JSON.parse(stored) as unknown;
         if (Array.isArray(parsed)) {
-          setCustomPresets(
-            parsed.filter(
-              (preset): preset is ReferencePreset =>
-                typeof preset === "object" &&
-                preset !== null &&
-                "id" in preset &&
-                "pose" in preset &&
-                "source" in preset &&
-                preset.source === "Custom"
-            )
+          const presets = parsed.filter(
+            (preset): preset is ReferencePreset =>
+              typeof preset === "object" &&
+              preset !== null &&
+              "id" in preset &&
+              "pose" in preset &&
+              "source" in preset &&
+              preset.source === "Custom"
           );
+          setCustomPresets(presets);
+
+          const defaultPreset = presets.find(
+            (preset) =>
+              preset.nameZh === DEFAULT_CUSTOM_PRESET_NAME ||
+              preset.nameEn === DEFAULT_CUSTOM_PRESET_NAME
+          );
+          if (defaultPreset) {
+            setDeskPose(applyReferencePreset(DEFAULT_DESK_POSE, defaultPreset));
+            setActivePresetId(defaultPreset.id);
+            setPreviewExpression(defaultPreset.expression);
+          }
         }
       }
     } catch {
