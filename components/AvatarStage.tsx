@@ -1,3 +1,5 @@
+ "use client";
+
 import AvatarFace from "@/components/AvatarFace";
 import SceneControlDock from "@/components/SceneControlDock";
 import SceneDialogueOverlay from "@/components/SceneDialogueOverlay";
@@ -11,6 +13,9 @@ import type {
   AvatarState,
   SceneDialogueEntry,
 } from "@/types/avatar";
+import { useState } from "react";
+import TranscriptPanel from "@/components/TranscriptPanel";
+import { uiText, useUiLanguage } from "@/lib/i18n/uiLanguage";
 
 type AvatarStageProps = {
   state: AvatarState;
@@ -86,6 +91,9 @@ export default function AvatarStage({
   onModelApiSettingsChange,
 }: AvatarStageProps) {
   const normalizedMouth = blendMouthOpen(state, mouthOpen);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const { language } = useUiLanguage();
+  const t = (en: string, zh: string) => uiText(language, en, zh);
 
   return (
     <section className="relative h-dvh w-full overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.14),_transparent_34%),radial-gradient(circle_at_bottom,_rgba(16,185,129,0.06),_transparent_32%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.98))]">
@@ -93,7 +101,8 @@ export default function AvatarStage({
       <div className="absolute -left-12 top-12 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
       <div className="absolute -right-12 bottom-10 h-48 w-48 rounded-full bg-emerald-400/10 blur-3xl" />
 
-      <div className="relative h-full w-full">
+      <div className="relative flex h-full w-full">
+        <div className="relative min-w-0 flex-1 transition-[width] duration-300">
         <div className="absolute inset-x-[12%] bottom-8 h-8 rounded-full bg-cyan-300/20 blur-3xl" />
         <AvatarFace
           state={state}
@@ -118,6 +127,8 @@ export default function AvatarStage({
           onAvatarModelChange={onAvatarModelChange}
           modelApiSettings={modelApiSettings}
           onModelApiSettingsChange={onModelApiSettingsChange}
+          historyOpen={historyOpen}
+          onHistoryToggle={() => setHistoryOpen((current) => !current)}
         />
         <SceneDialogueOverlay
           dialogue={dialogue}
@@ -139,6 +150,36 @@ export default function AvatarStage({
           onSpeakSentence={onSpeakSentence}
           onStopSpeech={onStopSpeech}
         />
+        </div>
+        <aside
+          className={[
+            "relative z-40 flex h-full shrink-0 flex-col overflow-hidden border-l border-white/10 bg-slate-950/95 shadow-2xl backdrop-blur-xl transition-[width] duration-300",
+            historyOpen ? "w-[clamp(320px,32vw,440px)]" : "w-0 border-l-0",
+          ].join(" ")}
+          aria-hidden={!historyOpen}
+        >
+          <div className="flex min-w-[320px] flex-1 flex-col">
+            <header className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+              <div className="min-w-0">
+                <h2 className="font-medium text-white">{t("Conversation history", "对话历史")}</h2>
+                <p className="mt-1 truncate text-xs text-slate-400">{activeSession.title}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHistoryOpen(false)}
+                className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10 hover:text-white"
+                aria-label={t("Close history", "关闭历史")}
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="m6 6 12 12M18 6 6 18" />
+                </svg>
+              </button>
+            </header>
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              <TranscriptPanel messages={activeSession.messages} embedded />
+            </div>
+          </div>
+        </aside>
       </div>
     </section>
   );

@@ -181,7 +181,11 @@ export default function AvatarWorkbench() {
           parsed.scenePresetId === "cc0-lounge" ||
           parsed.scenePresetId === "cozy-study" ||
           parsed.scenePresetId === "night-loft" ||
-          parsed.scenePresetId === "soft-studio"
+          parsed.scenePresetId === "soft-studio" ||
+          parsed.scenePresetId === "illustrated-bedroom" ||
+          parsed.scenePresetId === "cherry-park" ||
+          parsed.scenePresetId === "seaside" ||
+          parsed.scenePresetId === "sunset-street"
         ) {
           setScenePresetId(parsed.scenePresetId);
         }

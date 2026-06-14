@@ -1,10 +1,19 @@
-export type ScenePresetId = "cc0-lounge" | "cozy-study" | "night-loft" | "soft-studio";
+export type ScenePresetId =
+  | "cc0-lounge"
+  | "cozy-study"
+  | "night-loft"
+  | "soft-studio"
+  | "illustrated-bedroom"
+  | "cherry-park"
+  | "seaside"
+  | "sunset-street";
 
 export type ScenePreset = {
   id: ScenePresetId;
   name: string;
   description: string;
   swatch: string;
+  imageUrl?: string;
 };
 
 export type AvatarPreset = {
@@ -39,7 +48,43 @@ export const SCENE_PRESETS: ScenePreset[] = [
     description: "干净的弧形背景与柔光箱，突出角色本身。",
     swatch: "linear-gradient(135deg,#d8d4ce,#f4eee5)",
   },
+  {
+    id: "illustrated-bedroom",
+    name: "晴日卧室",
+    description: "明亮柔和的插画卧室背景。",
+    swatch: "#c9d9e9",
+    imageUrl: "/backgrounds/bedroom.png",
+  },
+  {
+    id: "cherry-park",
+    name: "樱花公园",
+    description: "盛开樱花与公园步道。",
+    swatch: "#f3b4cb",
+    imageUrl: "/backgrounds/cherry-park.png",
+  },
+  {
+    id: "seaside",
+    name: "海滨步道",
+    description: "晴空、海面与沿岸木栈道。",
+    swatch: "#5bbbe8",
+    imageUrl: "/backgrounds/seaside.png",
+  },
+  {
+    id: "sunset-street",
+    name: "黄昏街道",
+    description: "暖色夕阳下的安静商业街。",
+    swatch: "#d78365",
+    imageUrl: "/backgrounds/sunset-street.png",
+  },
 ];
+
+export function getScenePreset(id: ScenePresetId) {
+  return SCENE_PRESETS.find((preset) => preset.id === id) ?? SCENE_PRESETS[0];
+}
+
+export function isImageScenePreset(id: ScenePresetId) {
+  return Boolean(getScenePreset(id).imageUrl);
+}
 
 export const AVATAR_PRESETS: AvatarPreset[] = [
   {

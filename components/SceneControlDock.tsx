@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import TranscriptPanel from "@/components/TranscriptPanel";
 import {
   AVATAR_PRESETS,
   SCENE_PRESETS,
@@ -28,6 +27,8 @@ type SceneControlDockProps = {
   onAvatarModelChange: (url: string) => void;
   modelApiSettings: ModelApiSettings;
   onModelApiSettingsChange: (settings: ModelApiSettings) => void;
+  historyOpen: boolean;
+  onHistoryToggle: () => void;
 };
 
 const stateLabels: Record<AvatarState, [string, string]> = {
@@ -52,9 +53,10 @@ export default function SceneControlDock({
   onAvatarModelChange,
   modelApiSettings,
   onModelApiSettingsChange,
+  historyOpen,
+  onHistoryToggle,
 }: SceneControlDockProps) {
   const [panel, setPanel] = useState<Panel>(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const { language, setLanguage } = useUiLanguage();
   const t = (en: string, zh: string) => uiText(language, en, zh);
 
@@ -80,7 +82,7 @@ export default function SceneControlDock({
           label={t("History", "历史")}
           onClick={() => {
             setPanel(null);
-            setHistoryOpen((current) => !current);
+            onHistoryToggle();
           }}
         >
           <HistoryIcon />
@@ -95,32 +97,6 @@ export default function SceneControlDock({
           <InfoIcon />
         </DockButton>
       </div>
-
-      <aside
-        className={[
-          "pointer-events-auto absolute inset-y-0 right-0 z-50 flex w-[min(420px,92vw)] flex-col border-l border-white/10 bg-slate-950/95 shadow-2xl backdrop-blur-xl transition-transform duration-300",
-          historyOpen ? "translate-x-0" : "translate-x-full",
-        ].join(" ")}
-        aria-hidden={!historyOpen}
-      >
-        <header className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-          <div>
-            <h2 className="font-medium text-white">{t("Conversation history", "对话历史")}</h2>
-            <p className="mt-1 max-w-72 truncate text-xs text-slate-400">{activeSession.title}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setHistoryOpen(false)}
-            className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10 hover:text-white"
-            aria-label={t("Close history", "关闭历史")}
-          >
-            <CloseIcon />
-          </button>
-        </header>
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          <TranscriptPanel messages={activeSession.messages} embedded />
-        </div>
-      </aside>
 
       {panel ? (
         <div
@@ -361,7 +337,14 @@ function AppearancePanel({
                   : "border-white/10 bg-white/5 hover:border-white/25"
               }`}
             >
-              <span className="block h-20" style={{ background: preset.swatch }} />
+              <span
+                className="block h-20 bg-cover bg-center"
+                style={{
+                  background: preset.imageUrl
+                    ? `url("${preset.imageUrl}") center / cover`
+                    : preset.swatch,
+                }}
+              />
               <span className="block p-3">
                 <span className="block text-sm text-white">
                   {language === "en" ? sceneEnglish[preset.id].name : preset.name}
@@ -589,6 +572,22 @@ const sceneEnglish: Record<ScenePresetId, { name: string; description: string }>
   "soft-studio": {
     name: "Soft Studio",
     description: "A clean cyclorama and softboxes focused on the avatar.",
+  },
+  "illustrated-bedroom": {
+    name: "Sunny Bedroom",
+    description: "A bright and softly illustrated bedroom.",
+  },
+  "cherry-park": {
+    name: "Cherry Blossom Park",
+    description: "A garden path surrounded by blooming cherry trees.",
+  },
+  seaside: {
+    name: "Seaside Walk",
+    description: "Blue skies, the ocean, and a sunny coastal promenade.",
+  },
+  "sunset-street": {
+    name: "Sunset Street",
+    description: "A quiet shopping street under warm evening light.",
   },
 };
 

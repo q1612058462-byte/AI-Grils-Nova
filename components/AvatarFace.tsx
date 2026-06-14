@@ -40,7 +40,11 @@ import {
   type ReferencePreset,
 } from "@/lib/avatar/referenceLibrary";
 import type { AvatarExpression, AvatarState } from "@/types/avatar";
-import type { ScenePresetId } from "@/lib/avatar/appearanceLibrary";
+import {
+  getScenePreset,
+  isImageScenePreset,
+  type ScenePresetId,
+} from "@/lib/avatar/appearanceLibrary";
 
 type AvatarFaceProps = {
   state: AvatarState;
@@ -474,7 +478,7 @@ function VRMCharacter({
         }
 
         loadedVrm.scene.scale.setScalar(1.58);
-        loadedVrm.scene.position.set(0, -1.34, 0);
+        loadedVrm.scene.position.set(0, -1.42, 0);
         loadedVrm.scene.rotation.set(0, loadedVrm.meta.metaVersion === "0" ? Math.PI : 0, 0);
         loadedVrm.scene.traverse((object) => {
           if (!(object instanceof THREE.Mesh)) return;
@@ -559,7 +563,7 @@ function VRMCharacter({
     const stanceEnergy = 0.55 + locomotion * 0.55;
 
     vrm.scene.position.x = Math.sin(walk * 0.7) * profile.range + idleShift + weightShift;
-    vrm.scene.position.y = -1.34 + breath * 0.55;
+    vrm.scene.position.y = -1.42 + breath * 0.55;
     vrm.scene.position.z = 0;
     const frontRotation = vrm.meta.metaVersion === "0" ? Math.PI : 0;
     vrm.scene.rotation.y = THREE.MathUtils.damp(vrm.scene.rotation.y, frontRotation, 8, delta);
@@ -1485,6 +1489,7 @@ function SoftStudioScene() {
 }
 
 function SceneEnvironment({ presetId }: { presetId: ScenePresetId }) {
+  if (isImageScenePreset(presetId)) return null;
   if (presetId === "cc0-lounge") return <Cc0LoungeScene />;
   if (presetId === "night-loft") return <NightLoftScene />;
   if (presetId === "soft-studio") return <SoftStudioScene />;
@@ -1663,6 +1668,7 @@ export default function AvatarFace({
     () => [...REFERENCE_PRESETS, ...customPresets],
     [customPresets]
   );
+  const imageBackgroundUrl = getScenePreset(scenePresetId).imageUrl;
 
   useEffect(() => {
     try {
@@ -1765,12 +1771,16 @@ export default function AvatarFace({
     <div
       className="relative h-full w-full overflow-hidden"
       style={{
-        background:
+        backgroundColor:
           scenePresetId === "night-loft"
             ? "#070b18"
             : scenePresetId === "soft-studio"
               ? "#d8d4ce"
               : "#76685c",
+        backgroundImage: imageBackgroundUrl ? `url("${imageBackgroundUrl}")` : undefined,
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundSize: "cover",
       }}
     >
       <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.05)_48%,transparent_100%)]" />
@@ -1859,14 +1869,18 @@ export default function AvatarFace({
           gl.shadowMap.type = THREE.PCFSoftShadowMap;
         }}
       >
-        <color
-          attach="background"
-          args={[scenePresetId === "night-loft" ? "#070b18" : scenePresetId === "soft-studio" ? "#d8d4ce" : "#76685c"]}
-        />
-        <fog
-          attach="fog"
-          args={[scenePresetId === "night-loft" ? "#070b18" : scenePresetId === "soft-studio" ? "#d8d4ce" : "#76685c", 7, 15]}
-        />
+        {!imageBackgroundUrl ? (
+          <>
+            <color
+              attach="background"
+              args={[scenePresetId === "night-loft" ? "#070b18" : scenePresetId === "soft-studio" ? "#d8d4ce" : "#76685c"]}
+            />
+            <fog
+              attach="fog"
+              args={[scenePresetId === "night-loft" ? "#070b18" : scenePresetId === "soft-studio" ? "#d8d4ce" : "#76685c", 7, 15]}
+            />
+          </>
+        ) : null}
         <hemisphereLight
           args={[
             scenePresetId === "night-loft" ? "#8ca8ff" : "#f1f5f9",
@@ -1892,7 +1906,13 @@ export default function AvatarFace({
         ) : (
           <Environment
             preset={scenePresetId === "night-loft" ? "city" : "apartment"}
-            environmentIntensity={scenePresetId === "soft-studio" ? 0.42 : 0.2}
+            environmentIntensity={
+              imageBackgroundUrl
+                ? 0.34
+                : scenePresetId === "soft-studio"
+                  ? 0.42
+                  : 0.2
+            }
           />
         )}
         <OrbitControls
@@ -1926,17 +1946,19 @@ export default function AvatarFace({
           maxPolarAngle={Math.PI - 0.45}
         />
         <SceneEnvironment presetId={scenePresetId} />
-        <ContactShadows
-          key={`${scenePresetId}-${modelUrl}`}
-          position={[0, -1.48, 0.25]}
-          scale={8}
-          opacity={scenePresetId === "night-loft" ? 0.48 : 0.34}
-          blur={2.4}
-          far={4.5}
-          resolution={1024}
-          color={scenePresetId === "night-loft" ? "#050712" : "#3c2c24"}
-          frames={120}
-        />
+        {!imageBackgroundUrl ? (
+          <ContactShadows
+            key={`${scenePresetId}-${modelUrl}`}
+            position={[0, -1.48, 0.25]}
+            scale={8}
+            opacity={scenePresetId === "night-loft" ? 0.48 : 0.34}
+            blur={2.4}
+            far={4.5}
+            resolution={1024}
+            color={scenePresetId === "night-loft" ? "#050712" : "#3c2c24"}
+            frames={120}
+          />
+        ) : null}
         <VRMCharacter
           state={state}
           expression={previewExpression ?? expression}
