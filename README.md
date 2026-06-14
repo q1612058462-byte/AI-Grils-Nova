@@ -6,6 +6,8 @@ Nora supports OpenAI-compatible chat APIs, streaming subtitles, browser speech i
 avatar expressions, lip sync, multiple conversations, selectable scenes, and configurable VRM
 characters.
 
+![alt text](image.png)
+![alt text](image-1.png)
 ## Features
 
 - OpenAI-compatible streaming chat, including DeepSeek-compatible endpoints
