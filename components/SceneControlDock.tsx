@@ -2,9 +2,14 @@
 
 import { useState } from "react";
 import TranscriptPanel from "@/components/TranscriptPanel";
+import {
+  AVATAR_PRESETS,
+  SCENE_PRESETS,
+  type ScenePresetId,
+} from "@/lib/avatar/appearanceLibrary";
 import type { AvatarConversation, AvatarState } from "@/types/avatar";
 
-type Panel = "sessions" | "history" | "about" | null;
+type Panel = "appearance" | "sessions" | "history" | "about" | null;
 
 type SceneControlDockProps = {
   state: AvatarState;
@@ -15,6 +20,10 @@ type SceneControlDockProps = {
   onSelectSession: (id: string) => void;
   onRenameSession: (id: string, title: string) => void;
   onDeleteSession: (id: string) => void;
+  scenePresetId: ScenePresetId;
+  avatarModelUrl: string;
+  onScenePresetChange: (id: ScenePresetId) => void;
+  onAvatarModelChange: (url: string) => void;
 };
 
 const stateLabels: Record<AvatarState, string> = {
@@ -33,6 +42,10 @@ export default function SceneControlDock({
   onSelectSession,
   onRenameSession,
   onDeleteSession,
+  scenePresetId,
+  avatarModelUrl,
+  onScenePresetChange,
+  onAvatarModelChange,
 }: SceneControlDockProps) {
   const [panel, setPanel] = useState<Panel>(null);
 
@@ -45,6 +58,9 @@ export default function SceneControlDock({
           <span className="text-slate-500">·</span>
           <span className="text-cyan-200">{stateLabels[state]}</span>
         </div>
+        <DockButton label="场景与角色" onClick={() => setPanel("appearance")}>
+          <AppearanceIcon />
+        </DockButton>
         <DockButton label="会话" onClick={() => setPanel("sessions")}>
           <ChatIcon />
         </DockButton>
@@ -67,10 +83,18 @@ export default function SceneControlDock({
             <header className="flex items-center justify-between border-b border-white/10 px-5 py-4">
               <div>
                 <h2 className="font-medium text-white">
-                  {panel === "sessions" ? "会话管理" : panel === "history" ? "对话历史" : "关于页面"}
+                  {panel === "appearance"
+                    ? "场景与角色"
+                    : panel === "sessions"
+                      ? "会话管理"
+                      : panel === "history"
+                        ? "对话历史"
+                        : "关于页面"}
                 </h2>
                 <p className="mt-1 text-xs text-slate-400">
-                  {panel === "sessions"
+                  {panel === "appearance"
+                    ? "选择场景风格或切换 VRM 角色。"
+                    : panel === "sessions"
                     ? "每个会话拥有独立上下文和字幕记录。"
                     : panel === "history"
                       ? activeSession.title
@@ -88,7 +112,14 @@ export default function SceneControlDock({
             </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              {panel === "sessions" ? (
+              {panel === "appearance" ? (
+                <AppearancePanel
+                  scenePresetId={scenePresetId}
+                  avatarModelUrl={avatarModelUrl}
+                  onScenePresetChange={onScenePresetChange}
+                  onAvatarModelChange={onAvatarModelChange}
+                />
+              ) : panel === "sessions" ? (
                 <SessionManager
                   sessions={sessions}
                   activeSessionId={activeSession.id}
@@ -111,6 +142,99 @@ export default function SceneControlDock({
         </div>
       ) : null}
     </>
+  );
+}
+
+function AppearancePanel({
+  scenePresetId,
+  avatarModelUrl,
+  onScenePresetChange,
+  onAvatarModelChange,
+}: {
+  scenePresetId: ScenePresetId;
+  avatarModelUrl: string;
+  onScenePresetChange: (id: ScenePresetId) => void;
+  onAvatarModelChange: (url: string) => void;
+}) {
+  const [customUrl, setCustomUrl] = useState(
+    AVATAR_PRESETS.some((preset) => preset.modelUrl === avatarModelUrl) ? "" : avatarModelUrl
+  );
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">场景</h3>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {SCENE_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => onScenePresetChange(preset.id)}
+              className={`overflow-hidden rounded-2xl border text-left transition ${
+                scenePresetId === preset.id
+                  ? "border-cyan-300/60 bg-cyan-400/10"
+                  : "border-white/10 bg-white/5 hover:border-white/25"
+              }`}
+            >
+              <span className="block h-20" style={{ background: preset.swatch }} />
+              <span className="block p-3">
+                <span className="block text-sm text-white">{preset.name}</span>
+                <span className="mt-1 block text-xs leading-5 text-slate-400">{preset.description}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">角色</h3>
+        <div className="space-y-2">
+          {AVATAR_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => onAvatarModelChange(preset.modelUrl)}
+              className={`w-full rounded-2xl border p-4 text-left ${
+                avatarModelUrl === preset.modelUrl
+                  ? "border-cyan-300/50 bg-cyan-400/10"
+                  : "border-white/10 bg-white/5 hover:border-white/25"
+              }`}
+            >
+              <span className="block text-sm text-white">{preset.name}</span>
+              <span className="mt-1 block text-xs text-slate-400">{preset.description}</span>
+            </button>
+          ))}
+        </div>
+        <form
+          className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const url = customUrl.trim();
+            if (url) onAvatarModelChange(url);
+          }}
+        >
+          <label className="text-xs text-slate-400">自定义 VRM 地址</label>
+          <div className="mt-2 flex gap-2">
+            <input
+              value={customUrl}
+              onChange={(event) => setCustomUrl(event.target.value)}
+              placeholder="/models/another.vrm 或 https://..."
+              className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300/40"
+            />
+            <button
+              type="submit"
+              disabled={!customUrl.trim()}
+              className="rounded-xl border border-cyan-300/25 bg-cyan-400/10 px-4 text-sm text-cyan-100 disabled:opacity-40"
+            >
+              加载
+            </button>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            推荐将获得授权的 VRM 文件放入 public/models，使用同源地址可避免跨域问题。
+          </p>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -247,6 +371,10 @@ function formatTime(value: number) {
 
 function ChatIcon() {
   return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 5h14v10H9l-4 4V5Z" /></svg>;
+}
+
+function AppearanceIcon() {
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 5h16v14H4z" /><path d="m4 15 4-4 3 3 3-4 6 6M16.5 8h.01" /></svg>;
 }
 
 function HistoryIcon() {

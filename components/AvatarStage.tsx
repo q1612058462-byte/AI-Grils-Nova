@@ -2,6 +2,7 @@ import AvatarFace from "@/components/AvatarFace";
 import SceneControlDock from "@/components/SceneControlDock";
 import SceneDialogueOverlay from "@/components/SceneDialogueOverlay";
 import { blendMouthOpen } from "@/lib/avatar/expressionState";
+import type { ScenePresetId } from "@/lib/avatar/appearanceLibrary";
 import type { BrowserVoiceOption, BrowserVoiceSettings } from "@/lib/voice/browserSpeech";
 import type {
   AvatarConversation,
@@ -39,6 +40,10 @@ type AvatarStageProps = {
   onSelectSession: (id: string) => void;
   onRenameSession: (id: string, title: string) => void;
   onDeleteSession: (id: string) => void;
+  scenePresetId: ScenePresetId;
+  avatarModelUrl: string;
+  onScenePresetChange: (id: ScenePresetId) => void;
+  onAvatarModelChange: (url: string) => void;
 };
 
 export default function AvatarStage({
@@ -70,6 +75,10 @@ export default function AvatarStage({
   onSelectSession,
   onRenameSession,
   onDeleteSession,
+  scenePresetId,
+  avatarModelUrl,
+  onScenePresetChange,
+  onAvatarModelChange,
 }: AvatarStageProps) {
   const normalizedMouth = blendMouthOpen(state, mouthOpen);
 
@@ -86,6 +95,8 @@ export default function AvatarStage({
           expression={expression}
           mouthOpen={normalizedMouth}
           speaking={state === "speaking"}
+          scenePresetId={scenePresetId}
+          modelUrl={avatarModelUrl}
         />
         <SceneControlDock
           state={state}
@@ -96,6 +107,10 @@ export default function AvatarStage({
           onSelectSession={onSelectSession}
           onRenameSession={onRenameSession}
           onDeleteSession={onDeleteSession}
+          scenePresetId={scenePresetId}
+          avatarModelUrl={avatarModelUrl}
+          onScenePresetChange={onScenePresetChange}
+          onAvatarModelChange={onAvatarModelChange}
         />
         <SceneDialogueOverlay
           dialogue={dialogue}

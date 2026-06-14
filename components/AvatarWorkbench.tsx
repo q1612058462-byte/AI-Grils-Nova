@@ -5,6 +5,10 @@ import AvatarStage from "@/components/AvatarStage";
 import { deriveExpressionFromText } from "@/lib/avatar/expressionMapper";
 import { startFakeLipSync } from "@/lib/avatar/lipSync";
 import {
+  AVATAR_PRESETS,
+  type ScenePresetId,
+} from "@/lib/avatar/appearanceLibrary";
+import {
   createBrowserSpeechRecognition,
   getBrowserVoices,
   speakWithBrowser,
@@ -23,6 +27,7 @@ import type {
 const VOICE_OUTPUT_STORAGE_KEY = "avatar.voiceOutputEnabled.v1";
 const VOICE_SETTINGS_STORAGE_KEY = "avatar.voiceSettings.v1";
 const CONVERSATIONS_STORAGE_KEY = "avatar.conversations.v1";
+const APPEARANCE_STORAGE_KEY = "avatar.appearance.v1";
 const DEFAULT_VOICE_SETTINGS: BrowserVoiceSettings = {
   voiceURI: "",
   rate: 0.95,
@@ -76,6 +81,8 @@ export default function AvatarWorkbench() {
   const [voiceOutputEnabled, setVoiceOutputEnabled] = useState(true);
   const [voices, setVoices] = useState<BrowserVoiceOption[]>([]);
   const [voiceSettings, setVoiceSettings] = useState(DEFAULT_VOICE_SETTINGS);
+  const [scenePresetId, setScenePresetId] = useState<ScenePresetId>("cozy-study");
+  const [avatarModelUrl, setAvatarModelUrl] = useState(AVATAR_PRESETS[0].modelUrl);
 
   const lipSyncStopRef = useRef<(() => void) | null>(null);
   const modelAbortRef = useRef<AbortController | null>(null);
@@ -149,6 +156,28 @@ export default function AvatarWorkbench() {
       }
     }
     setSessionsHydrated(true);
+
+    const storedAppearance = window.localStorage.getItem(APPEARANCE_STORAGE_KEY);
+    if (storedAppearance) {
+      try {
+        const parsed = JSON.parse(storedAppearance) as {
+          scenePresetId?: ScenePresetId;
+          avatarModelUrl?: string;
+        };
+        if (
+          parsed.scenePresetId === "cozy-study" ||
+          parsed.scenePresetId === "night-loft" ||
+          parsed.scenePresetId === "soft-studio"
+        ) {
+          setScenePresetId(parsed.scenePresetId);
+        }
+        if (typeof parsed.avatarModelUrl === "string" && parsed.avatarModelUrl.trim()) {
+          setAvatarModelUrl(parsed.avatarModelUrl);
+        }
+      } catch {
+        window.localStorage.removeItem(APPEARANCE_STORAGE_KEY);
+      }
+    }
 
     setVoiceInputSupported(supportsBrowserSpeechRecognition());
     const storedVoiceOutput = window.localStorage.getItem(VOICE_OUTPUT_STORAGE_KEY);
@@ -464,6 +493,22 @@ export default function AvatarWorkbench() {
   };
 
   const inputDisabled = isModelLoading || (state !== "idle" && state !== "listening");
+  const updateScenePreset = useCallback((id: ScenePresetId) => {
+    setScenePresetId(id);
+    window.localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify({
+      scenePresetId: id,
+      avatarModelUrl,
+    }));
+  }, [avatarModelUrl]);
+  const updateAvatarModel = useCallback((url: string) => {
+    const normalized = url.trim();
+    if (!normalized) return;
+    setAvatarModelUrl(normalized);
+    window.localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify({
+      scenePresetId,
+      avatarModelUrl: normalized,
+    }));
+  }, [scenePresetId]);
 
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-slate-950">
@@ -498,6 +543,10 @@ export default function AvatarWorkbench() {
         onSelectSession={selectSession}
         onRenameSession={renameSession}
         onDeleteSession={deleteSession}
+        scenePresetId={scenePresetId}
+        avatarModelUrl={avatarModelUrl}
+        onScenePresetChange={updateScenePreset}
+        onAvatarModelChange={updateAvatarModel}
       />
 
       {error ? (

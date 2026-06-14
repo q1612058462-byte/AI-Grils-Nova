@@ -36,12 +36,15 @@ import {
   type ReferencePreset,
 } from "@/lib/avatar/referenceLibrary";
 import type { AvatarExpression, AvatarState } from "@/types/avatar";
+import type { ScenePresetId } from "@/lib/avatar/appearanceLibrary";
 
 type AvatarFaceProps = {
   state: AvatarState;
   expression: AvatarExpression;
   mouthOpen: number;
   speaking: boolean;
+  scenePresetId: ScenePresetId;
+  modelUrl: string;
 };
 
 type VRMCharacterProps = AvatarFaceProps & {
@@ -63,9 +66,6 @@ type BoneNodeEntry = {
   node: THREE.Object3D;
 };
 
-const DEFAULT_VRM_MODEL_URL =
-  process.env.NEXT_PUBLIC_VRM_MODEL_URL ||
-  "/models/nora.vrm";
 const CUSTOM_PRESETS_STORAGE_KEY = "avatar.customPosePresets.v1";
 const DEFAULT_REFERENCE_PRESET =
   REFERENCE_PRESETS.find((preset) => preset.id === "comfort") ?? REFERENCE_PRESETS[0];
@@ -325,7 +325,8 @@ function VRMCharacter({
   onCharacterPositionChange,
   onCharacterPositionDelta,
   onBoneRotationChange,
-  onAvailableBonesChange,
+    onAvailableBonesChange,
+    modelUrl,
 }: VRMCharacterProps) {
   const [vrm, setVRM] = useState<VRM | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -452,7 +453,7 @@ function VRMCharacter({
     loader.register((parser) => new VRMLoaderPlugin(parser));
 
     loader.load(
-      DEFAULT_VRM_MODEL_URL,
+      modelUrl,
       (gltf) => {
         if (cancelled) {
           return;
@@ -488,7 +489,7 @@ function VRMCharacter({
     return () => {
       cancelled = true;
     };
-  }, [onAvailableBonesChange]);
+  }, [modelUrl, onAvailableBonesChange]);
 
   useEffect(() => {
     return () => {
@@ -1060,7 +1061,7 @@ function VRMCharacter({
   );
 }
 
-function RoomScene() {
+function CozyStudyScene() {
   return (
     <group position={[0, 0, -1.15]}>
       <mesh position={[0, 1.15, -0.45]} receiveShadow>
@@ -1198,7 +1199,130 @@ function RoomScene() {
   );
 }
 
-export default function AvatarFace({ state, expression, mouthOpen, speaking }: AvatarFaceProps) {
+function NightLoftScene() {
+  const cityLights = useMemo(
+    () => Array.from({ length: 42 }, (_, index) => ({
+      x: -3.6 + (index % 7) * 1.18,
+      y: -0.5 + Math.floor(index / 7) * 0.55,
+      color: index % 4 === 0 ? "#fbbf24" : index % 3 === 0 ? "#60a5fa" : "#c4b5fd",
+    })),
+    []
+  );
+
+  return (
+    <group position={[0, 0, -1.1]}>
+      <mesh position={[0, -1.55, 1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[9, 7]} />
+        <meshStandardMaterial color="#151827" roughness={0.34} metalness={0.32} />
+      </mesh>
+      <mesh position={[0, 1.1, -0.8]} receiveShadow>
+        <boxGeometry args={[8.8, 5.2, 0.1]} />
+        <meshStandardMaterial color="#111827" roughness={0.78} />
+      </mesh>
+
+      <group position={[0, 1.05, -0.7]}>
+        <mesh>
+          <planeGeometry args={[6.8, 3.65]} />
+          <meshStandardMaterial color="#070b18" emissive="#111b45" emissiveIntensity={0.55} />
+        </mesh>
+        {cityLights.map((light, index) => (
+          <mesh key={index} position={[light.x, light.y, 0.035]}>
+            <planeGeometry args={[0.42, 0.18]} />
+            <meshBasicMaterial color={light.color} transparent opacity={0.35 + (index % 3) * 0.14} />
+          </mesh>
+        ))}
+        {[-2.25, 0, 2.25].map((x) => (
+          <mesh key={x} position={[x, 0, 0.08]}>
+            <boxGeometry args={[0.075, 3.72, 0.08]} />
+            <meshStandardMaterial color="#293247" metalness={0.65} roughness={0.28} />
+          </mesh>
+        ))}
+      </group>
+
+      <RoundedBox position={[0, -0.35, 0.95]} args={[5.5, 0.18, 1.35]} radius={0.07} castShadow receiveShadow>
+        <meshStandardMaterial color="#24283a" roughness={0.42} metalness={0.18} />
+      </RoundedBox>
+      <RoundedBox position={[0, -0.68, 1.38]} args={[5.25, 0.5, 0.12]} radius={0.04} castShadow>
+        <meshStandardMaterial color="#111522" roughness={0.7} />
+      </RoundedBox>
+
+      <group position={[-2.55, -0.55, 0.05]}>
+        <RoundedBox args={[1.45, 0.95, 0.75]} radius={0.16} castShadow>
+          <meshStandardMaterial color="#312e4d" roughness={0.7} />
+        </RoundedBox>
+        <RoundedBox position={[0, 0.48, -0.12]} args={[1.45, 0.75, 0.28]} radius={0.14} castShadow>
+          <meshStandardMaterial color="#3d385f" roughness={0.72} />
+        </RoundedBox>
+      </group>
+
+      <group position={[2.65, -0.85, 0.1]}>
+        <mesh castShadow>
+          <cylinderGeometry args={[0.3, 0.38, 0.42, 32]} />
+          <meshStandardMaterial color="#20293a" roughness={0.58} metalness={0.22} />
+        </mesh>
+        {[0, 1, 2, 3, 4].map((index) => (
+          <mesh key={index} position={[Math.sin(index * 2.1) * 0.22, 0.38 + index * 0.08, Math.cos(index * 1.7) * 0.1]} rotation={[0, 0, index * 0.7]}>
+            <sphereGeometry args={[0.18, 18, 12]} />
+            <meshStandardMaterial color={index % 2 ? "#245c55" : "#2f7668"} roughness={0.82} />
+          </mesh>
+        ))}
+      </group>
+      <pointLight position={[-2.5, 0.2, 1.3]} color="#8b5cf6" intensity={1.1} distance={4} />
+      <pointLight position={[2.7, 0.5, 0.8]} color="#38bdf8" intensity={0.9} distance={4} />
+    </group>
+  );
+}
+
+function SoftStudioScene() {
+  return (
+    <group position={[0, 0, -1.05]}>
+      <mesh position={[0, 0.5, -0.8]} receiveShadow>
+        <planeGeometry args={[10, 6]} />
+        <meshStandardMaterial color="#dedbd5" roughness={0.88} />
+      </mesh>
+      <mesh position={[0, -1.52, 1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[10, 7]} />
+        <meshStandardMaterial color="#cbc7bf" roughness={0.68} />
+      </mesh>
+      <mesh position={[0, -1.1, -0.42]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[4.7, 4.7, 1.4, 64, 1, true, 0, Math.PI]} />
+        <meshStandardMaterial color="#d7d3cc" roughness={0.9} side={THREE.DoubleSide} />
+      </mesh>
+      <RoundedBox position={[0, -0.4, 1.05]} args={[4.7, 0.14, 1.18]} radius={0.06} castShadow receiveShadow>
+        <meshStandardMaterial color="#b79f84" roughness={0.64} />
+      </RoundedBox>
+      <mesh position={[-2.85, 0.45, 0.45]} rotation={[0, 0.3, -0.08]}>
+        <boxGeometry args={[1.2, 2.2, 0.08]} />
+        <meshStandardMaterial color="#fff8e9" emissive="#fff1cf" emissiveIntensity={0.65} />
+      </mesh>
+      <mesh position={[2.85, 0.65, 0.3]} rotation={[0, -0.35, 0.08]}>
+        <boxGeometry args={[1.15, 2.1, 0.08]} />
+        <meshStandardMaterial color="#e6f3ff" emissive="#d7efff" emissiveIntensity={0.58} />
+      </mesh>
+      <RoundedBox position={[2.25, -1.15, -0.05]} args={[0.95, 0.7, 0.95]} radius={0.08} castShadow>
+        <meshStandardMaterial color="#a98b72" roughness={0.78} />
+      </RoundedBox>
+      <RoundedBox position={[-2.2, -1.3, 0.1]} args={[0.75, 0.4, 0.75]} radius={0.18} castShadow>
+        <meshStandardMaterial color="#6c756c" roughness={0.86} />
+      </RoundedBox>
+    </group>
+  );
+}
+
+function SceneEnvironment({ presetId }: { presetId: ScenePresetId }) {
+  if (presetId === "night-loft") return <NightLoftScene />;
+  if (presetId === "soft-studio") return <SoftStudioScene />;
+  return <CozyStudyScene />;
+}
+
+export default function AvatarFace({
+  state,
+  expression,
+  mouthOpen,
+  speaking,
+  scenePresetId,
+  modelUrl,
+}: AvatarFaceProps) {
   const [showPoseDebug, setShowPoseDebug] = useState(false);
   const [showReferenceLibrary, setShowReferenceLibrary] = useState(false);
   const [enableCharacterMove, setEnableCharacterMove] = useState(false);
@@ -1317,7 +1441,17 @@ export default function AvatarFace({ state, expression, mouthOpen, speaking }: A
   }, []);
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#bba995]">
+    <div
+      className="relative h-full w-full overflow-hidden"
+      style={{
+        background:
+          scenePresetId === "night-loft"
+            ? "#070b18"
+            : scenePresetId === "soft-studio"
+              ? "#d8d4ce"
+              : "#76685c",
+      }}
+    >
       <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.05)_48%,transparent_100%)]" />
       <div className="absolute left-4 top-4 z-30 flex gap-2">
         {canShowPoseDebug && (
@@ -1391,13 +1525,32 @@ export default function AvatarFace({ state, expression, mouthOpen, speaking }: A
           gl.toneMappingExposure = 0.72;
         }}
       >
-        <color attach="background" args={["#76685c"]} />
-        <fog attach="fog" args={["#76685c", 7, 14]} />
-        <hemisphereLight args={["#d6e4e8", "#49382f", 0.48]} />
-        <directionalLight position={[3.5, 4.5, 4]} intensity={1.05} castShadow color="#ffe4c4" />
-        <directionalLight position={[-3, 2.5, 3]} intensity={0.28} color="#9ec4d2" />
-        <spotLight position={[0, 3.8, 3]} angle={0.48} penumbra={0.9} intensity={0.42} color="#ffd4a3" />
-        <Environment preset="apartment" environmentIntensity={0.18} />
+        <color
+          attach="background"
+          args={[scenePresetId === "night-loft" ? "#070b18" : scenePresetId === "soft-studio" ? "#d8d4ce" : "#76685c"]}
+        />
+        <fog
+          attach="fog"
+          args={[scenePresetId === "night-loft" ? "#070b18" : scenePresetId === "soft-studio" ? "#d8d4ce" : "#76685c", 7, 15]}
+        />
+        <hemisphereLight
+          args={[
+            scenePresetId === "night-loft" ? "#8ca8ff" : "#f1f5f9",
+            scenePresetId === "night-loft" ? "#101326" : "#59483d",
+            scenePresetId === "soft-studio" ? 0.9 : 0.5,
+          ]}
+        />
+        <directionalLight
+          position={[3.5, 4.5, 4]}
+          intensity={scenePresetId === "soft-studio" ? 1.35 : 1.05}
+          castShadow
+          color={scenePresetId === "night-loft" ? "#b9c8ff" : "#ffe4c4"}
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
+        />
+        <directionalLight position={[-3, 2.5, 3]} intensity={0.38} color={scenePresetId === "night-loft" ? "#8b5cf6" : "#9ec4d2"} />
+        <spotLight position={[0, 4.2, 3]} angle={0.5} penumbra={0.9} intensity={0.55} color={scenePresetId === "night-loft" ? "#93c5fd" : "#ffd4a3"} />
+        <Environment preset={scenePresetId === "night-loft" ? "city" : "apartment"} environmentIntensity={scenePresetId === "soft-studio" ? 0.42 : 0.2} />
         <OrbitControls
           makeDefault
           target={[0, 0.46, 0]}
@@ -1408,7 +1561,7 @@ export default function AvatarFace({ state, expression, mouthOpen, speaking }: A
           minPolarAngle={0.45}
           maxPolarAngle={Math.PI - 0.45}
         />
-        <RoomScene />
+        <SceneEnvironment presetId={scenePresetId} />
         <VRMCharacter
           state={state}
           expression={previewExpression ?? expression}
@@ -1425,6 +1578,8 @@ export default function AvatarFace({ state, expression, mouthOpen, speaking }: A
           onCharacterPositionDelta={moveCharacterBy}
           onBoneRotationChange={updateBoneRotation}
           onAvailableBonesChange={updateAvailableBones}
+          scenePresetId={scenePresetId}
+          modelUrl={modelUrl}
         />
       </Canvas>
     </div>
