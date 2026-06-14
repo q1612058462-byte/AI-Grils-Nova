@@ -14,8 +14,9 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Nora - AI Digital Human MVP",
-  description: "A browser-based AI avatar MVP powered by OpenAI Realtime or mock mode.",
+  title: "Nora AI Avatar",
+  description:
+    "Interactive VRM avatar with OpenAI-compatible chat, voice, scenes, and conversation management.",
 };
 
 export default function RootLayout({
@@ -24,7 +25,7 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className={`${spaceGrotesk.variable} ${fraunces.variable} bg-slate-950 text-slate-100`}>
         {children}
       </body>

@@ -1,158 +1,174 @@
-# Nora - AI Digital Human MVP
+# Nora AI Avatar
 
-一个基于 Next.js + TypeScript + Tailwind CSS 的数字人 MVP。
+An interactive browser-based AI avatar built with Next.js, React Three Fiber, Three.js, and VRM.
 
-## 运行方式
+Nora supports OpenAI-compatible chat APIs, streaming subtitles, browser speech input and output,
+avatar expressions, lip sync, multiple conversations, selectable scenes, and configurable VRM
+characters.
 
-1. 安装依赖
+## Features
+
+- OpenAI-compatible streaming chat, including DeepSeek-compatible endpoints
+- Multiple local conversations with independent model context
+- Full-screen VRM scene with expression and lip-sync feedback
+- Browser speech recognition and text-to-speech
+- Sentence-by-sentence automatic or manual subtitle playback
+- English and Chinese interface
+- 3D, HDRI, PBR, and illustrated background presets
+- Selectable system voices, speech rate, and pitch
+- Runtime model API settings
+- Optional camera rotation, panning, pose debugging, and motion reference tools
+
+## Tech Stack
+
+- Next.js 15
+- React 19
+- TypeScript
+- Tailwind CSS
+- Three.js and React Three Fiber
+- `@pixiv/three-vrm`
+
+## Quick Start
+
+Requirements:
+
+- Node.js 20 or newer
+- npm
+- A modern Chromium browser is recommended for speech recognition
 
 ```bash
+git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
+cd YOUR_REPOSITORY
 npm install
-```
-
-2. 启动开发环境
-
-```bash
+cp .env.example .env.local
 npm run dev
 ```
 
-3. 打开浏览器访问本地开发地址
+Open <http://localhost:3000>.
 
-## 环境变量
+On Windows PowerShell, replace the copy command with:
 
-- `OPENAI_API_KEY`
-- `OPENAI_REALTIME_MODEL`
-- `NEXT_PUBLIC_USE_MOCK_AVATAR`
-- `NEXT_PUBLIC_VRM_MODEL_URL`
-- `OPENAI_COMPATIBLE_API_KEY`
-- `OPENAI_COMPATIBLE_BASE_URL`
-- `OPENAI_COMPATIBLE_MODEL`
-
-示例：
-
-```bash
-OPENAI_API_KEY=sk-...
-OPENAI_REALTIME_MODEL=gpt-realtime
-NEXT_PUBLIC_USE_MOCK_AVATAR=true
-NEXT_PUBLIC_VRM_MODEL_URL=/models/nora.vrm
-OPENAI_COMPATIBLE_API_KEY=sk-your-api-key
-OPENAI_COMPATIBLE_BASE_URL=https://api.deepseek.com
-OPENAI_COMPATIBLE_MODEL=deepseek-v4-flash
+```powershell
+Copy-Item .env.example .env.local
 ```
 
-## OpenAI-compatible 文本对话
+## Model API Configuration
 
-将服务商的密钥、Base URL 和模型名写入项目根目录的 `.env.local`。重启开发服务器后，
-页面中的模型测试会通过服务端 `/api/chat` 调用兼容 OpenAI Chat Completions 的流式接口。
-密钥只在服务端读取，不会发送到浏览器。
-
-DeepSeek 示例：
+Configure an OpenAI-compatible Chat Completions endpoint in `.env.local`:
 
 ```env
-OPENAI_COMPATIBLE_API_KEY=sk-...
+OPENAI_COMPATIBLE_API_KEY=your-api-key
 OPENAI_COMPATIBLE_BASE_URL=https://api.deepseek.com
-OPENAI_COMPATIBLE_MODEL=deepseek-v4-flash
+OPENAI_COMPATIBLE_MODEL=deepseek-chat
 ```
 
-其他服务商只需替换对应的 Base URL 和模型名。为兼容现有配置，代码仍会回退读取
-`DEEPSEEK_API_KEY` 和 `DEEPSEEK_MODEL`。
+The API key remains on the Next.js server. The in-page settings panel can also override the base
+URL, model, API key, temperature, top-p, and maximum output tokens. Browser overrides are stored in
+localStorage, so server-side environment variables are recommended on shared devices.
 
-## Mock 模式如何工作
+Legacy `DEEPSEEK_API_KEY` and `DEEPSEEK_MODEL` variables remain supported as fallbacks.
 
-如果 `OPENAI_API_KEY` 缺失，或者显式设置了 `NEXT_PUBLIC_USE_MOCK_AVATAR=true`，页面会默认进入 mock 模式。
+## Avatar Configuration
 
-点击麦克风后会自动模拟：
+The default VRM file is:
 
-1. `listening` 持续约 2 秒
-2. 注入一条用户转写
-3. 进入 `thinking`
-4. 注入 Nora 的回复
-5. 进入 `speaking`
-6. 播放假口型
-7. 回到 `idle`
+```text
+public/models/nora.vrm
+```
 
-## OpenAI Realtime 接入点
+You can replace it or add more character options:
 
-### 服务端会话
+```env
+NEXT_PUBLIC_VRM_MODEL_URL=/models/nora.vrm
+NEXT_PUBLIC_VRM_MODEL_NAME_2=Second Avatar
+NEXT_PUBLIC_VRM_MODEL_URL_2=/models/second-avatar.vrm
+NEXT_PUBLIC_VRM_MODEL_NAME_3=Third Avatar
+NEXT_PUBLIC_VRM_MODEL_URL_3=/models/third-avatar.vrm
+```
 
-文件：
+Additional VRM files should contain the standard VRM expression presets, especially blink and
+mouth shapes, for complete animation support.
 
-- `app/api/realtime/session/route.ts`
+The included `nora.vrm` was introduced as a copy of VRoid Studio's `AvatarSample_A`. Review the
+[sample repository](https://github.com/madjin/vrm-samples) and
+[VRoid Studio guidelines](https://vroid.pixiv.help/hc/en-us/articles/4402394424089) before
+redistributing or commercially using the model.
 
-这个路由会使用服务端 `OPENAI_API_KEY` 创建 ephemeral client secret，不会把密钥暴露给浏览器。
+## Camera And Debug Controls
 
-### 浏览器连接层
+Normal use disables camera rotation, camera panning, pose debugging, and the motion library.
 
-文件：
+```env
+NEXT_PUBLIC_ENABLE_CAMERA_ROTATION=false
+NEXT_PUBLIC_CAMERA_ZOOM_RATIO=1.6
+NEXT_PUBLIC_ENABLE_CAMERA_PAN=false
+NEXT_PUBLIC_ENABLE_POSE_DEBUG=false
+NEXT_PUBLIC_ENABLE_MOTION_LIBRARY=false
+```
 
-- `lib/realtime/createRealtimeConnection.ts`
+`NEXT_PUBLIC_CAMERA_ZOOM_RATIO` is clamped between `1.05` and `3`.
 
-这里实现了一个可替换的连接管理器：
+Restart the development server after changing any `NEXT_PUBLIC_*` variable.
 
-- mock 模式完全可用
-- real 模式是一个尽量完整的 WebRTC 骨架
-- 连接失败会自动回落到 mock
+## Voice Support
 
-## 3D 角色与后续替换点
+- Speech recognition uses the browser Web Speech API.
+- Speech output uses `speechSynthesis`.
+- Available voices depend on the operating system and browser.
+- Microsoft Edge commonly provides additional online Chinese voices.
 
-当前角色层使用 Three.js + VRM，已经具备：
+Microphone access generally requires HTTPS outside localhost.
 
-- 面向镜头的自然上半身姿态
-- 聆听、思考和说话时的头部与手臂反馈
-- `Aa / Ih / Ou` 混合口型
-- 表情变化和随机眨眼
-- 带窗户、书架和暖光灯的室内场景
+## Scripts
 
-默认模型位于 `public/models/nora.vrm`，也可以通过 `NEXT_PUBLIC_VRM_MODEL_URL` 指向自己的 VRM 文件。
+```bash
+npm run dev
+npm run typecheck
+npm run build
+npm run start
+```
 
-默认资产使用 VRoid Studio 的 `AvatarSample_A`：
+## Deployment
 
-- 模型整理来源：https://github.com/madjin/vrm-samples
-- 官方使用条款：https://vroid.pixiv.help/hc/en-us/articles/4402394424089
+The project can be deployed to Vercel or any Node.js host capable of running Next.js.
 
-替换模型时建议保留完整的 VRM 表情预设，尤其是 `neutral`、`blink`、`aa`、`ih` 和 `ou`，否则表情或口型可能无法完整驱动。
+For Vercel:
 
-如果以后要替换成真实资产，建议从下面两个文件开始：
+1. Import the GitHub repository.
+2. Add the required environment variables.
+3. Deploy with the default Next.js settings.
 
-- `components/AvatarStage.tsx`
-- `components/AvatarFace.tsx`
+Do not commit `.env.local` or real API keys.
 
-### 替换成 Live2D
+## Asset Licenses
 
-保留 `AvatarStage` 的状态输入，把 `AvatarFace` 内部的 Three.js 场景换成 Live2D 渲染层即可。
+Code is licensed under the MIT License. Assets are licensed separately:
 
-### 替换 VRM 模型
+- Poly Haven and ambientCG scene assets are CC0. See
+  [`public/assets/ASSET_LICENSES.md`](public/assets/ASSET_LICENSES.md).
+- The included VRM model remains subject to its original model license.
+- Project-specific illustrated backgrounds and design reference images are not automatically
+  covered by the MIT License.
 
-将新模型放入 `public/models/`，并修改 `NEXT_PUBLIC_VRM_MODEL_URL` 即可。角色加载、骨骼动作和口型驱动集中在 `AvatarFace` 中。
+Review [`NOTICE.md`](NOTICE.md) before redistributing the repository or replacing assets.
 
-### 优化口型
+## Project Structure
 
-当前口型逻辑在：
+```text
+app/                 Next.js pages and API routes
+components/          Scene, avatar, subtitles, drawers, and settings UI
+lib/avatar/          Pose, expression, appearance, and lip-sync logic
+lib/dialogue/        Sentence playback helpers
+lib/model/           Model API settings
+lib/voice/           Browser speech adapters
+public/assets/       CC0 HDRI, PBR, and GLB assets
+public/backgrounds/  Illustrated background presets
+public/models/       VRM characters
+types/               Shared TypeScript types
+```
 
-- `lib/avatar/lipSync.ts`
+## Security
 
-现在是 requestAnimationFrame 驱动的假口型。后续可以：
-
-- 接入 `AnalyserNode`
-- 从音频流读取振幅
-- 按音素或能量曲线驱动嘴型
-
-### 接真实 OpenAI Realtime WebRTC
-
-当前骨架在：
-
-- `lib/realtime/createRealtimeConnection.ts`
-
-后续可以继续完善：
-
-- `RTCPeerConnection` 事件处理
-- `data channel` 消息映射
-- 更细粒度的文本和音频状态切换
-
-## 目录说明
-
-- `app/` 页面、布局和 API 路由
-- `components/` 头像、按钮、状态、转写面板
-- `lib/` 表达式、口型、提示词和 Realtime 连接层
-- `types/` 共享类型
-- `styles/` 全局样式
+- Keep API keys in `.env.local` or the deployment platform's secret manager.
+- Never expose provider keys through `NEXT_PUBLIC_*` variables.
+- The model proxy only accepts HTTPS base URLs, except local development endpoints.

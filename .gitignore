@@ -5,3 +5,8 @@ dist
 .env.local
 .env.*.local
 *.log
+*.tsbuildinfo
+tmp/
+.vercel/
+.DS_Store
+Thumbs.db
