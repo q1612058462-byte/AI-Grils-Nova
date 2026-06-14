@@ -158,7 +158,7 @@ export default function AvatarStage({
           ].join(" ")}
           aria-hidden={!historyOpen}
         >
-          <div className="flex min-w-[320px] flex-1 flex-col">
+          <div className="flex h-full min-h-0 min-w-[320px] flex-1 flex-col">
             <header className="flex items-center justify-between border-b border-white/10 px-5 py-4">
               <div className="min-w-0">
                 <h2 className="font-medium text-white">{t("Conversation history", "对话历史")}</h2>
@@ -175,7 +175,7 @@ export default function AvatarStage({
                 </svg>
               </button>
             </header>
-            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            <div className="min-h-0 flex-1 overflow-y-scroll overscroll-contain p-5 [scrollbar-color:rgba(148,163,184,0.45)_transparent] [scrollbar-width:thin]">
               <TranscriptPanel messages={activeSession.messages} embedded />
             </div>
           </div>

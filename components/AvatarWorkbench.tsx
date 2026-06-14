@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AvatarStage from "@/components/AvatarStage";
-import { deriveExpressionFromText } from "@/lib/avatar/expressionMapper";
+import {
+  getSpeakableText,
+  parseAvatarResponse,
+} from "@/lib/avatar/expressionMapper";
 import { startFakeLipSync } from "@/lib/avatar/lipSync";
 import {
   AVATAR_PRESETS,
@@ -393,7 +396,13 @@ export default function AvatarWorkbench() {
 
   const speakSentence = useCallback(async (text: string) => {
     cancelSpeech();
-    const playback = speakWithBrowser(text, voiceSettings, {
+    const speakableText = getSpeakableText(text);
+    if (!speakableText) {
+      setState("idle");
+      return;
+    }
+
+    const playback = speakWithBrowser(speakableText, voiceSettings, {
       onStart: () => {
         setState("speaking");
         lipSyncStopRef.current?.();
@@ -497,19 +506,32 @@ export default function AvatarWorkbench() {
             if (!delta) continue;
 
             reply += delta;
+            const parsedReply = parseAvatarResponse(reply, "comfort");
             updateSession(targetSession.id, (session) => ({
               ...session,
               messages: session.messages.map((entry) =>
-                entry.id === assistantId ? { ...entry, text: reply } : entry
+                entry.id === assistantId
+                  ? { ...entry, text: parsedReply.text }
+                  : entry
               ),
               updatedAt: Date.now(),
             }));
-            setExpression(deriveExpressionFromText(reply, "comfort"));
+            setExpression(parsedReply.expression);
           }
         }
       }
 
       if (!reply.trim()) throw new Error("模型返回了空回复。");
+      const finalReply = parseAvatarResponse(reply, "comfort");
+      if (!finalReply.text) {
+        updateSession(targetSession.id, (session) => ({
+          ...session,
+          messages: session.messages.map((entry) =>
+            entry.id === assistantId ? { ...entry, text: "…" } : entry
+          ),
+          updatedAt: Date.now(),
+        }));
+      }
       setState("idle");
     } catch (requestError) {
       if (controller.signal.aborted) return;

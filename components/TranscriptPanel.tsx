@@ -35,7 +35,7 @@ export default function TranscriptPanel({
 
   if (embedded) {
     return (
-      <div className="space-y-3">
+      <div className="min-h-0 space-y-3 pb-5">
         {messages.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-slate-400">
             {t("No messages in this session yet.", "这个会话还没有对话记录。")}
