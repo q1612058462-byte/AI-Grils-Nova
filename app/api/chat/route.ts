@@ -1,0 +1,101 @@
+import { NextResponse } from "next/server";
+import { getNoraSystemPrompt } from "@/lib/prompts/noraSystemPrompt";
+
+export const runtime = "nodejs";
+
+type CompatibleMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+function isCompatibleMessage(value: unknown): value is CompatibleMessage {
+  if (typeof value !== "object" || value === null) return false;
+  const message = value as Partial<CompatibleMessage>;
+  return (
+    (message.role === "user" || message.role === "assistant") &&
+    typeof message.content === "string" &&
+    message.content.trim().length > 0
+  );
+}
+
+function getChatCompletionsUrl(baseUrl: string) {
+  const normalized = baseUrl.replace(/\/+$/, "");
+  return normalized.endsWith("/chat/completions")
+    ? normalized
+    : `${normalized}/chat/completions`;
+}
+
+export async function POST(request: Request) {
+  const apiKey =
+    process.env.OPENAI_COMPATIBLE_API_KEY ||
+    process.env.DEEPSEEK_API_KEY;
+  const baseUrl =
+    process.env.OPENAI_COMPATIBLE_BASE_URL ||
+    "https://api.deepseek.com";
+  const model =
+    process.env.OPENAI_COMPATIBLE_MODEL ||
+    process.env.DEEPSEEK_MODEL ||
+    "deepseek-v4-flash";
+
+  if (!apiKey) {
+    return NextResponse.json(
+      {
+        error:
+          "OPENAI_COMPATIBLE_API_KEY is missing. Add it to .env.local and restart the server.",
+      },
+      { status: 500 }
+    );
+  }
+
+  try {
+    const body = (await request.json()) as { messages?: unknown };
+    const messages = Array.isArray(body.messages)
+      ? body.messages.filter(isCompatibleMessage).slice(-24)
+      : [];
+
+    if (messages.length === 0 || messages[messages.length - 1].role !== "user") {
+      return NextResponse.json({ error: "A final user message is required." }, { status: 400 });
+    }
+
+    const upstream = await fetch(getChatCompletionsUrl(baseUrl), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: getNoraSystemPrompt() },
+          ...messages,
+        ],
+        stream: true,
+      }),
+      signal: request.signal,
+    });
+
+    if (!upstream.ok || !upstream.body) {
+      const details = await upstream.text();
+      return NextResponse.json(
+        {
+          error: `Compatible API request failed with status ${upstream.status}.`,
+          details,
+        },
+        { status: upstream.status }
+      );
+    }
+
+    return new Response(upstream.body, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Model": model,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown compatible API error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

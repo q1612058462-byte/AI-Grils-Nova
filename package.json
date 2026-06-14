@@ -1,0 +1,28 @@
+{
+  "name": "avatar-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@pixiv/three-vrm": "^3.5.3",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
+    "next": "15.5.19",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.18",
+    "@types/react": "^19.0.16",
+    "@types/react-dom": "^19.0.3",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.3"
+  }
+}
