@@ -1,4 +1,4 @@
-export type ScenePresetId = "cozy-study" | "night-loft" | "soft-studio";
+export type ScenePresetId = "cc0-lounge" | "cozy-study" | "night-loft" | "soft-studio";
 
 export type ScenePreset = {
   id: ScenePresetId;
@@ -15,6 +15,12 @@ export type AvatarPreset = {
 };
 
 export const SCENE_PRESETS: ScenePreset[] = [
+  {
+    id: "cc0-lounge",
+    name: "CC0 资产客厅",
+    description: "真实 GLB 家具、PBR 木地板与室内 HDRI。",
+    swatch: "linear-gradient(135deg,#5f4638,#d8c2a3)",
+  },
   {
     id: "cozy-study",
     name: "温暖书房",

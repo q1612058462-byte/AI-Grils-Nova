@@ -81,7 +81,7 @@ export default function AvatarWorkbench() {
   const [voiceOutputEnabled, setVoiceOutputEnabled] = useState(true);
   const [voices, setVoices] = useState<BrowserVoiceOption[]>([]);
   const [voiceSettings, setVoiceSettings] = useState(DEFAULT_VOICE_SETTINGS);
-  const [scenePresetId, setScenePresetId] = useState<ScenePresetId>("cozy-study");
+  const [scenePresetId, setScenePresetId] = useState<ScenePresetId>("cc0-lounge");
   const [avatarModelUrl, setAvatarModelUrl] = useState(AVATAR_PRESETS[0].modelUrl);
 
   const lipSyncStopRef = useRef<(() => void) | null>(null);
@@ -165,6 +165,7 @@ export default function AvatarWorkbench() {
           avatarModelUrl?: string;
         };
         if (
+          parsed.scenePresetId === "cc0-lounge" ||
           parsed.scenePresetId === "cozy-study" ||
           parsed.scenePresetId === "night-loft" ||
           parsed.scenePresetId === "soft-studio"

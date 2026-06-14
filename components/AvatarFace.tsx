@@ -9,6 +9,8 @@ import {
   OrbitControls,
   RoundedBox,
   TransformControls,
+  useGLTF,
+  useTexture,
 } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1483,9 +1485,146 @@ function SoftStudioScene() {
 }
 
 function SceneEnvironment({ presetId }: { presetId: ScenePresetId }) {
+  if (presetId === "cc0-lounge") return <Cc0LoungeScene />;
   if (presetId === "night-loft") return <NightLoftScene />;
   if (presetId === "soft-studio") return <SoftStudioScene />;
   return <CozyStudyScene />;
+}
+
+function AssetModel({
+  url,
+  position,
+  rotation = [0, 0, 0],
+  scale = 1,
+}: {
+  url: string;
+  position: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: number;
+}) {
+  const { scene } = useGLTF(url);
+  const instance = useMemo(() => {
+    const cloned = scene.clone(true);
+    cloned.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      object.castShadow = true;
+      object.receiveShadow = true;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of materials) {
+        const physicalMaterial = material as THREE.MeshStandardMaterial;
+        physicalMaterial.envMapIntensity = 0.85;
+      }
+    });
+    return cloned;
+  }, [scene]);
+
+  return (
+    <primitive
+      object={instance}
+      position={position}
+      rotation={rotation}
+      scale={scale}
+    />
+  );
+}
+
+function Cc0LoungeScene() {
+  const floor = useTexture({
+    map: "/assets/materials/wood-floor-051/WoodFloor051_1K-JPG_Color.jpg",
+    normalMap: "/assets/materials/wood-floor-051/WoodFloor051_1K-JPG_NormalGL.jpg",
+    roughnessMap: "/assets/materials/wood-floor-051/WoodFloor051_1K-JPG_Roughness.jpg",
+    aoMap: "/assets/materials/wood-floor-051/WoodFloor051_1K-JPG_AmbientOcclusion.jpg",
+  });
+
+  useEffect(() => {
+    Object.entries(floor).forEach(([key, texture]) => {
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(4, 4);
+      texture.anisotropy = 8;
+      if (key === "map") texture.colorSpace = THREE.SRGBColorSpace;
+      texture.needsUpdate = true;
+    });
+  }, [floor]);
+
+  return (
+    <group position={[0, 0, -1.08]}>
+      <mesh position={[0, -1.52, 0.8]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[9, 7, 1, 1]} />
+        <meshStandardMaterial
+          {...floor}
+          color="#b99572"
+          roughness={0.72}
+          normalScale={new THREE.Vector2(0.65, 0.65)}
+        />
+      </mesh>
+      <mesh position={[0, 1, -1]} receiveShadow>
+        <boxGeometry args={[9, 5.2, 0.12]} />
+        <meshStandardMaterial color="#d8d0c5" roughness={0.94} />
+      </mesh>
+      <mesh position={[-4.05, 0.8, 0.8]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
+        <boxGeometry args={[3.8, 5.2, 0.12]} />
+        <meshStandardMaterial color="#c9beb0" roughness={0.94} />
+      </mesh>
+
+      <group position={[0, 1.25, -0.9]}>
+        <mesh>
+          <planeGeometry args={[3.8, 2.25]} />
+          <meshPhysicalMaterial
+            color="#9bb4bd"
+            roughness={0.08}
+            transmission={0.08}
+            metalness={0.05}
+            clearcoat={0.35}
+          />
+        </mesh>
+        {[-1.27, 0, 1.27].map((x) => (
+          <mesh key={x} position={[x, 0, 0.06]}>
+            <boxGeometry args={[0.055, 2.3, 0.08]} />
+            <meshStandardMaterial color="#e7ded2" roughness={0.6} />
+          </mesh>
+        ))}
+        <mesh position={[0, 0, 0.06]}>
+          <boxGeometry args={[3.85, 0.055, 0.08]} />
+          <meshStandardMaterial color="#e7ded2" roughness={0.6} />
+        </mesh>
+      </group>
+
+      <AssetModel
+        url="/assets/models/polyhaven/Sofa_01.glb"
+        position={[-2.05, -1.5, -0.2]}
+        rotation={[0, 0.35, 0]}
+        scale={1.05}
+      />
+      <AssetModel
+        url="/assets/models/polyhaven/coffee_table_round_01.glb"
+        position={[1.85, -1.5, 0.15]}
+        scale={0.85}
+      />
+      <AssetModel
+        url="/assets/models/polyhaven/desk_lamp_arm_01.glb"
+        position={[2.45, -0.55, -0.12]}
+        rotation={[0, -0.65, 0]}
+        scale={0.72}
+      />
+
+      <RoundedBox position={[0, -0.35, 1.2]} args={[5.2, 0.14, 1.15]} radius={0.06} castShadow receiveShadow>
+        <meshPhysicalMaterial color="#6d4d38" roughness={0.48} clearcoat={0.16} clearcoatRoughness={0.65} />
+      </RoundedBox>
+      <RoundedBox position={[0, -0.7, 1.58]} args={[5.05, 0.55, 0.11]} radius={0.04} castShadow>
+        <meshStandardMaterial color="#3e2d25" roughness={0.8} />
+      </RoundedBox>
+      <mesh position={[-1.9, -1.02, 1.3]} castShadow>
+        <boxGeometry args={[0.15, 1.25, 0.15]} />
+        <meshStandardMaterial color="#35261f" roughness={0.85} />
+      </mesh>
+      <mesh position={[1.9, -1.02, 1.3]} castShadow>
+        <boxGeometry args={[0.15, 1.25, 0.15]} />
+        <meshStandardMaterial color="#35261f" roughness={0.85} />
+      </mesh>
+      <pointLight position={[2.4, 0.5, 0.1]} color="#ffd6a3" intensity={0.85} distance={4} decay={2} />
+    </group>
+  );
 }
 
 export default function AvatarFace({
@@ -1726,7 +1865,17 @@ export default function AvatarFace({
         />
         <directionalLight position={[-3, 2.5, 3]} intensity={0.38} color={scenePresetId === "night-loft" ? "#8b5cf6" : "#9ec4d2"} />
         <spotLight position={[0, 4.2, 3]} angle={0.5} penumbra={0.9} intensity={0.55} color={scenePresetId === "night-loft" ? "#93c5fd" : "#ffd4a3"} />
-        <Environment preset={scenePresetId === "night-loft" ? "city" : "apartment"} environmentIntensity={scenePresetId === "soft-studio" ? 0.42 : 0.2} />
+        {scenePresetId === "cc0-lounge" ? (
+          <Environment
+            files="/assets/hdri/combination_room_1k.hdr"
+            environmentIntensity={0.42}
+          />
+        ) : (
+          <Environment
+            preset={scenePresetId === "night-loft" ? "city" : "apartment"}
+            environmentIntensity={scenePresetId === "soft-studio" ? 0.42 : 0.2}
+          />
+        )}
         <OrbitControls
           makeDefault
           target={[0, 0.46, 0]}
@@ -1772,3 +1921,7 @@ export default function AvatarFace({
     </div>
   );
 }
+
+useGLTF.preload("/assets/models/polyhaven/Sofa_01.glb");
+useGLTF.preload("/assets/models/polyhaven/coffee_table_round_01.glb");
+useGLTF.preload("/assets/models/polyhaven/desk_lamp_arm_01.glb");
