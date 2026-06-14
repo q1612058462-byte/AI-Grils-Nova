@@ -8,9 +8,10 @@ import {
   type ScenePresetId,
 } from "@/lib/avatar/appearanceLibrary";
 import type { ModelApiSettings } from "@/lib/model/modelApiSettings";
+import { uiText, useUiLanguage } from "@/lib/i18n/uiLanguage";
 import type { AvatarConversation, AvatarState } from "@/types/avatar";
 
-type Panel = "appearance" | "settings" | "sessions" | "history" | "about" | null;
+type Panel = "appearance" | "settings" | "sessions" | "about" | null;
 
 type SceneControlDockProps = {
   state: AvatarState;
@@ -29,11 +30,11 @@ type SceneControlDockProps = {
   onModelApiSettingsChange: (settings: ModelApiSettings) => void;
 };
 
-const stateLabels: Record<AvatarState, string> = {
-  idle: "待机",
-  listening: "聆听",
-  thinking: "思考",
-  speaking: "回应",
+const stateLabels: Record<AvatarState, [string, string]> = {
+  idle: ["Idle", "待机"],
+  listening: ["Listening", "聆听"],
+  thinking: ["Thinking", "思考"],
+  speaking: ["Speaking", "回应"],
 };
 
 export default function SceneControlDock({
@@ -53,6 +54,9 @@ export default function SceneControlDock({
   onModelApiSettingsChange,
 }: SceneControlDockProps) {
   const [panel, setPanel] = useState<Panel>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const { language, setLanguage } = useUiLanguage();
+  const t = (en: string, zh: string) => uiText(language, en, zh);
 
   return (
     <>
@@ -61,24 +65,62 @@ export default function SceneControlDock({
           <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.9)]" />
           <span className="truncate">{activeSession.title}</span>
           <span className="text-slate-500">·</span>
-          <span className="text-cyan-200">{stateLabels[state]}</span>
+          <span className="text-cyan-200">{uiText(language, ...stateLabels[state])}</span>
         </div>
-        <DockButton label="场景与角色" onClick={() => setPanel("appearance")}>
+        <DockButton label={t("Scene & avatar", "场景与角色")} onClick={() => setPanel("appearance")}>
           <AppearanceIcon />
         </DockButton>
-        <DockButton label="设置" onClick={() => setPanel("settings")}>
+        <DockButton label={t("Settings", "设置")} onClick={() => setPanel("settings")}>
           <SettingsIcon />
         </DockButton>
-        <DockButton label="会话" onClick={() => setPanel("sessions")}>
+        <DockButton label={t("Sessions", "会话")} onClick={() => setPanel("sessions")}>
           <ChatIcon />
         </DockButton>
-        <DockButton label="历史" onClick={() => setPanel("history")}>
+        <DockButton
+          label={t("History", "历史")}
+          onClick={() => {
+            setPanel(null);
+            setHistoryOpen((current) => !current);
+          }}
+        >
           <HistoryIcon />
         </DockButton>
-        <DockButton label="说明" onClick={() => setPanel("about")}>
+        <DockButton
+          label={t("Switch to Chinese", "切换为英文")}
+          onClick={() => setLanguage(language === "en" ? "zh" : "en")}
+        >
+          <span className="text-[11px] font-semibold">{language === "en" ? "中" : "EN"}</span>
+        </DockButton>
+        <DockButton label={t("About", "说明")} onClick={() => setPanel("about")}>
           <InfoIcon />
         </DockButton>
       </div>
+
+      <aside
+        className={[
+          "pointer-events-auto absolute inset-y-0 right-0 z-50 flex w-[min(420px,92vw)] flex-col border-l border-white/10 bg-slate-950/95 shadow-2xl backdrop-blur-xl transition-transform duration-300",
+          historyOpen ? "translate-x-0" : "translate-x-full",
+        ].join(" ")}
+        aria-hidden={!historyOpen}
+      >
+        <header className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <div>
+            <h2 className="font-medium text-white">{t("Conversation history", "对话历史")}</h2>
+            <p className="mt-1 max-w-72 truncate text-xs text-slate-400">{activeSession.title}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setHistoryOpen(false)}
+            className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10 hover:text-white"
+            aria-label={t("Close history", "关闭历史")}
+          >
+            <CloseIcon />
+          </button>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          <TranscriptPanel messages={activeSession.messages} embedded />
+        </div>
+      </aside>
 
       {panel ? (
         <div
@@ -92,32 +134,28 @@ export default function SceneControlDock({
               <div>
                 <h2 className="font-medium text-white">
                   {panel === "appearance"
-                    ? "场景与角色"
+                    ? t("Scene & avatar", "场景与角色")
                     : panel === "settings"
-                      ? "设置"
+                      ? t("Settings", "设置")
                     : panel === "sessions"
-                      ? "会话管理"
-                      : panel === "history"
-                        ? "对话历史"
-                        : "关于页面"}
+                      ? t("Session management", "会话管理")
+                      : t("About", "关于页面")}
                 </h2>
                 <p className="mt-1 text-xs text-slate-400">
                   {panel === "appearance"
-                    ? "选择场景风格或切换 VRM 角色。"
+                    ? t("Choose a scene or VRM avatar.", "选择场景风格或切换 VRM 角色。")
                     : panel === "settings"
-                      ? "配置模型 API 与生成参数。"
+                      ? t("Configure the model API and generation parameters.", "配置模型 API 与生成参数。")
                     : panel === "sessions"
-                    ? "每个会话拥有独立上下文和字幕记录。"
-                    : panel === "history"
-                      ? activeSession.title
-                      : "Nora 数字人对话场景"}
+                    ? t("Each session has independent context and subtitles.", "每个会话拥有独立上下文和字幕记录。")
+                    : t("Nora digital avatar scene", "Nora 数字人对话场景")}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setPanel(null)}
                 className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10 hover:text-white"
-                aria-label="关闭"
+                aria-label={t("Close", "关闭")}
               >
                 <CloseIcon />
               </button>
@@ -149,8 +187,6 @@ export default function SceneControlDock({
                   onRename={onRenameSession}
                   onDelete={onDeleteSession}
                 />
-              ) : panel === "history" ? (
-                <TranscriptPanel messages={activeSession.messages} embedded />
               ) : (
                 <AboutPanel />
               )}
@@ -171,6 +207,8 @@ function ModelSettingsPanel({
 }) {
   const [draft, setDraft] = useState(settings);
   const [saved, setSaved] = useState(false);
+  const { language } = useUiLanguage();
+  const t = (en: string, zh: string) => uiText(language, en, zh);
 
   useEffect(() => setDraft(settings), [settings]);
 
@@ -196,15 +234,15 @@ function ModelSettingsPanel({
           <input
             value={draft.baseUrl}
             onChange={(event) => update("baseUrl", event.target.value)}
-            placeholder="留空使用 .env，例如 https://api.deepseek.com"
+            placeholder={t("Leave blank to use .env", "留空使用 .env，例如 https://api.deepseek.com")}
             className={inputClassName}
           />
         </SettingsField>
-        <SettingsField label="模型名称">
+        <SettingsField label={t("Model", "模型名称")}>
           <input
             value={draft.model}
             onChange={(event) => update("model", event.target.value)}
-            placeholder="留空使用 .env"
+            placeholder={t("Leave blank to use .env", "留空使用 .env")}
             className={inputClassName}
           />
         </SettingsField>
@@ -213,7 +251,7 @@ function ModelSettingsPanel({
             type="password"
             value={draft.apiKey}
             onChange={(event) => update("apiKey", event.target.value)}
-            placeholder="留空使用服务端密钥"
+            placeholder={t("Leave blank to use the server key", "留空使用服务端密钥")}
             autoComplete="off"
             className={inputClassName}
           />
@@ -240,7 +278,7 @@ function ModelSettingsPanel({
             className="w-full accent-cyan-400"
           />
         </SettingsField>
-        <SettingsField label="最大输出 Tokens">
+        <SettingsField label={t("Max output tokens", "最大输出 Tokens")}>
           <input
             type="number"
             min="1"
@@ -252,12 +290,15 @@ function ModelSettingsPanel({
         </SettingsField>
       </div>
       <div className="rounded-2xl border border-amber-300/10 bg-amber-300/5 px-4 py-3 text-xs leading-5 text-amber-100/70">
-        页面填写的 API Key 仅保存在当前浏览器的 localStorage。公共设备上建议使用服务端 `.env`。
+        {t(
+          "The API key entered here is stored only in this browser's localStorage. Use server-side .env on shared devices.",
+          "页面填写的 API Key 仅保存在当前浏览器的 localStorage。公共设备上建议使用服务端 `.env`。"
+        )}
       </div>
       <div className="flex justify-end">
         <button
           type="submit"
-          title="保存模型设置"
+          title={t("Save model settings", "保存模型设置")}
           className="flex h-10 w-10 items-center justify-center rounded-full border border-cyan-300/25 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20"
         >
           {saved ? <CheckIcon /> : <SaveIcon />}
@@ -298,6 +339,8 @@ function AppearancePanel({
   onScenePresetChange: (id: ScenePresetId) => void;
   onAvatarModelChange: (url: string) => void;
 }) {
+  const { language } = useUiLanguage();
+  const t = (en: string, zh: string) => uiText(language, en, zh);
   const [customUrl, setCustomUrl] = useState(
     AVATAR_PRESETS.some((preset) => preset.modelUrl === avatarModelUrl) ? "" : avatarModelUrl
   );
@@ -305,7 +348,7 @@ function AppearancePanel({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">场景</h3>
+        <h3 className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">{t("Scenes", "场景")}</h3>
         <div className="grid gap-3 sm:grid-cols-3">
           {SCENE_PRESETS.map((preset) => (
             <button
@@ -320,8 +363,12 @@ function AppearancePanel({
             >
               <span className="block h-20" style={{ background: preset.swatch }} />
               <span className="block p-3">
-                <span className="block text-sm text-white">{preset.name}</span>
-                <span className="mt-1 block text-xs leading-5 text-slate-400">{preset.description}</span>
+                <span className="block text-sm text-white">
+                  {language === "en" ? sceneEnglish[preset.id].name : preset.name}
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-slate-400">
+                  {language === "en" ? sceneEnglish[preset.id].description : preset.description}
+                </span>
               </span>
             </button>
           ))}
@@ -329,7 +376,7 @@ function AppearancePanel({
       </div>
 
       <div>
-        <h3 className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">角色</h3>
+        <h3 className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">{t("Avatars", "角色")}</h3>
         <div className="space-y-2">
           {AVATAR_PRESETS.map((preset) => (
             <button
@@ -343,7 +390,9 @@ function AppearancePanel({
               }`}
             >
               <span className="block text-sm text-white">{preset.name}</span>
-              <span className="mt-1 block text-xs text-slate-400">{preset.description}</span>
+              <span className="mt-1 block text-xs text-slate-400">
+                {language === "en" ? "Installed VRM avatar." : preset.description}
+              </span>
             </button>
           ))}
         </div>
@@ -355,12 +404,12 @@ function AppearancePanel({
             if (url) onAvatarModelChange(url);
           }}
         >
-          <label className="text-xs text-slate-400">自定义 VRM 地址</label>
+          <label className="text-xs text-slate-400">{t("Custom VRM URL", "自定义 VRM 地址")}</label>
           <div className="mt-2 flex gap-2">
             <input
               value={customUrl}
               onChange={(event) => setCustomUrl(event.target.value)}
-              placeholder="/models/another.vrm 或 https://..."
+              placeholder="/models/another.vrm or https://..."
               className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300/40"
             />
             <button
@@ -368,11 +417,14 @@ function AppearancePanel({
               disabled={!customUrl.trim()}
               className="rounded-xl border border-cyan-300/25 bg-cyan-400/10 px-4 text-sm text-cyan-100 disabled:opacity-40"
             >
-              加载
+              {t("Load", "加载")}
             </button>
           </div>
           <p className="mt-2 text-xs leading-5 text-slate-500">
-            推荐将获得授权的 VRM 文件放入 public/models，使用同源地址可避免跨域问题。
+            {t(
+              "Place licensed VRM files in public/models. Same-origin URLs avoid CORS issues.",
+              "推荐将获得授权的 VRM 文件放入 public/models，使用同源地址可避免跨域问题。"
+            )}
           </p>
         </form>
       </div>
@@ -397,13 +449,15 @@ function SessionManager({
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
 }) {
+  const { language } = useUiLanguage();
+  const t = (en: string, zh: string) => uiText(language, en, zh);
   return (
     <div>
       <button
         type="button"
         onClick={onCreate}
         disabled={busy}
-        title="新建会话"
+        title={t("New session", "新建会话")}
         className="mb-4 flex h-11 w-11 items-center justify-center rounded-full border border-cyan-300/25 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20 disabled:opacity-40"
       >
         <PlusIcon />
@@ -429,17 +483,17 @@ function SessionManager({
                 >
                   <span className="block truncate text-sm text-slate-100">{session.title}</span>
                   <span className="mt-1 block text-xs text-slate-500">
-                    {session.messages.length} 条消息 · {formatTime(session.updatedAt)}
+                    {session.messages.length} {t("messages", "条消息")} · {formatTime(session.updatedAt, language)}
                   </span>
                 </button>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => {
-                    const title = window.prompt("会话名称", session.title)?.trim();
+                    const title = window.prompt(t("Session name", "会话名称"), session.title)?.trim();
                     if (title) onRename(session.id, title);
                   }}
-                  title="重命名"
+                  title={t("Rename", "重命名")}
                   className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-white/10 hover:text-white disabled:opacity-40"
                 >
                   <EditIcon />
@@ -448,9 +502,9 @@ function SessionManager({
                   type="button"
                   disabled={busy || sessions.length === 1}
                   onClick={() => {
-                    if (window.confirm(`删除会话“${session.title}”？`)) onDelete(session.id);
+                    if (window.confirm(t(`Delete session "${session.title}"?`, `删除会话“${session.title}”？`))) onDelete(session.id);
                   }}
-                  title="删除"
+                  title={t("Delete", "删除")}
                   className="flex h-8 w-8 items-center justify-center rounded-full text-rose-300 hover:bg-rose-400/10 disabled:opacity-30"
                 >
                   <TrashIcon />
@@ -460,24 +514,29 @@ function SessionManager({
           );
         })}
       </div>
-      {busy ? <p className="mt-3 text-xs text-amber-200/80">回复生成期间暂不能切换会话。</p> : null}
+      {busy ? <p className="mt-3 text-xs text-amber-200/80">{t("Sessions are locked while generating a reply.", "回复生成期间暂不能切换会话。")}</p> : null}
     </div>
   );
 }
 
 function AboutPanel() {
+  const { language } = useUiLanguage();
+  const t = (en: string, zh: string) => uiText(language, en, zh);
   return (
     <div className="space-y-4 text-sm leading-7 text-slate-300">
       <p>
-        Nora 是一个支持 OpenAI 兼容模型的网页数字人原型。对话会以字幕或气泡形式进入场景，并可配合语音输入、逐句朗读、表情和口型反馈。
+        {t(
+          "Nora is a web-based digital avatar supporting OpenAI-compatible models, scene subtitles, speech input, sentence playback, expressions, and lip sync.",
+          "Nora 是一个支持 OpenAI 兼容模型的网页数字人原型。对话会以字幕或气泡形式进入场景，并可配合语音输入、逐句朗读、表情和口型反馈。"
+        )}
       </p>
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-        <h3 className="font-medium text-white">场景操作</h3>
-        <p className="mt-2">拖动画面旋转镜头，滚轮缩放，右键拖动平移视角。姿势调试模式下可选择和拖动骨骼节点。</p>
+        <h3 className="font-medium text-white">{t("Scene controls", "场景操作")}</h3>
+        <p className="mt-2">{t("Use the wheel or pinch gesture to zoom. Camera rotation and panning may be enabled by environment settings.", "使用滚轮或双指缩放。镜头旋转和平移可通过环境配置开启。")}</p>
       </div>
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-        <h3 className="font-medium text-white">会话与隐私</h3>
-        <p className="mt-2">会话记录保存在当前浏览器的本地存储中。不同会话使用各自的消息历史作为模型上下文。</p>
+        <h3 className="font-medium text-white">{t("Sessions & privacy", "会话与隐私")}</h3>
+        <p className="mt-2">{t("Sessions are stored in this browser. Each session uses its own message history as model context.", "会话记录保存在当前浏览器的本地存储中。不同会话使用各自的消息历史作为模型上下文。")}</p>
       </div>
     </div>
   );
@@ -505,14 +564,33 @@ function DockButton({
   );
 }
 
-function formatTime(value: number) {
-  return new Intl.DateTimeFormat("zh-CN", {
+function formatTime(value: number, language: "en" | "zh") {
+  return new Intl.DateTimeFormat(language === "zh" ? "zh-CN" : "en-US", {
     month: "numeric",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   }).format(value);
 }
+
+const sceneEnglish: Record<ScenePresetId, { name: string; description: string }> = {
+  "cc0-lounge": {
+    name: "CC0 Asset Lounge",
+    description: "Real GLB furniture, PBR wood flooring, and an indoor HDRI.",
+  },
+  "cozy-study": {
+    name: "Cozy Study",
+    description: "Wood desk, bookshelves, warm lighting, and soft daylight.",
+  },
+  "night-loft": {
+    name: "Night Loft",
+    description: "City lights, large windows, and blue-violet ambience.",
+  },
+  "soft-studio": {
+    name: "Soft Studio",
+    description: "A clean cyclorama and softboxes focused on the avatar.",
+  },
+};
 
 function ChatIcon() {
   return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 5h14v10H9l-4 4V5Z" /></svg>;

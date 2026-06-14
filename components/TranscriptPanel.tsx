@@ -1,4 +1,5 @@
 import type { TranscriptEntry } from "@/types/avatar";
+import { uiText, useUiLanguage } from "@/lib/i18n/uiLanguage";
 
 function TranscriptBubble({ entry }: { entry: TranscriptEntry }) {
   const isUser = entry.speaker === "user";
@@ -29,12 +30,15 @@ export default function TranscriptPanel({
   messages: TranscriptEntry[];
   embedded?: boolean;
 }) {
+  const { language } = useUiLanguage();
+  const t = (en: string, zh: string) => uiText(language, en, zh);
+
   if (embedded) {
     return (
       <div className="space-y-3">
         {messages.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-slate-400">
-            这个会话还没有对话记录。
+            {t("No messages in this session yet.", "这个会话还没有对话记录。")}
           </div>
         ) : (
           messages.map((entry) => <TranscriptBubble key={entry.id} entry={entry} />)
@@ -47,15 +51,15 @@ export default function TranscriptPanel({
     <aside className="flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-950/70 p-4 shadow-glow backdrop-blur">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-white">对话记录</h2>
-          <p className="text-xs text-slate-400">简洁展示用户与 Nora 的上下文。</p>
+          <h2 className="text-sm font-semibold text-white">{t("Conversation history", "对话记录")}</h2>
+          <p className="text-xs text-slate-400">{t("User and Nora context.", "简洁展示用户与 Nora 的上下文。")}</p>
         </div>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto pr-1">
         {messages.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 px-4 py-6 text-sm text-slate-400">
-            先点一下麦克风，Nora 会开始一轮 mock 对话。
+            {t("Start a conversation with Nora.", "开始与 Nora 对话。")}
           </div>
         ) : (
           messages.map((entry) => <TranscriptBubble key={entry.id} entry={entry} />)

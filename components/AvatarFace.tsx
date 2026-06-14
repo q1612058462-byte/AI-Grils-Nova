@@ -1650,6 +1650,12 @@ export default function AvatarFace({
   const [activePresetId, setActivePresetId] = useState(DEFAULT_REFERENCE_PRESET.id);
   const [previewExpression, setPreviewExpression] = useState<AvatarExpression | null>(null);
   const canRotateCamera = process.env.NEXT_PUBLIC_ENABLE_CAMERA_ROTATION === "true";
+  const canPanCamera = process.env.NEXT_PUBLIC_ENABLE_CAMERA_PAN === "true";
+  const cameraZoomRatio = Math.min(
+    3,
+    Math.max(1.05, Number(process.env.NEXT_PUBLIC_CAMERA_ZOOM_RATIO) || 1.6)
+  );
+  const defaultCameraDistance = 3.45;
   const canShowPoseDebug = process.env.NEXT_PUBLIC_ENABLE_POSE_DEBUG === "true";
   const canShowReferenceLibrary =
     process.env.NEXT_PUBLIC_ENABLE_MOTION_LIBRARY === "true";
@@ -1896,18 +1902,26 @@ export default function AvatarFace({
           dampingFactor={0.08}
           enableRotate={canRotateCamera}
           enableZoom
-          enablePan
+          enablePan={canPanCamera}
           mouseButtons={{
-            LEFT: canRotateCamera ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN,
+            LEFT: canRotateCamera
+              ? THREE.MOUSE.ROTATE
+              : canPanCamera
+                ? THREE.MOUSE.PAN
+                : undefined,
             MIDDLE: THREE.MOUSE.DOLLY,
-            RIGHT: THREE.MOUSE.PAN,
+            RIGHT: canPanCamera ? THREE.MOUSE.PAN : undefined,
           }}
           touches={{
-            ONE: canRotateCamera ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN,
-            TWO: THREE.TOUCH.DOLLY_PAN,
+            ONE: canRotateCamera
+              ? THREE.TOUCH.ROTATE
+              : canPanCamera
+                ? THREE.TOUCH.PAN
+                : undefined,
+            TWO: canPanCamera ? THREE.TOUCH.DOLLY_PAN : THREE.TOUCH.DOLLY_ROTATE,
           }}
-          minDistance={1.8}
-          maxDistance={7}
+          minDistance={defaultCameraDistance / cameraZoomRatio}
+          maxDistance={defaultCameraDistance * cameraZoomRatio}
           minPolarAngle={0.45}
           maxPolarAngle={Math.PI - 0.45}
         />

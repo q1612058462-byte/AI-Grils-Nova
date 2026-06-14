@@ -14,6 +14,10 @@ import {
   type ModelApiSettings,
 } from "@/lib/model/modelApiSettings";
 import {
+  UiLanguageProvider,
+  type UiLanguage,
+} from "@/lib/i18n/uiLanguage";
+import {
   createBrowserSpeechRecognition,
   getBrowserVoices,
   speakWithBrowser,
@@ -34,13 +38,14 @@ const VOICE_SETTINGS_STORAGE_KEY = "avatar.voiceSettings.v1";
 const CONVERSATIONS_STORAGE_KEY = "avatar.conversations.v1";
 const APPEARANCE_STORAGE_KEY = "avatar.appearance.v1";
 const MODEL_API_SETTINGS_STORAGE_KEY = "avatar.modelApiSettings.v1";
+const UI_LANGUAGE_STORAGE_KEY = "avatar.uiLanguage.v1";
 const DEFAULT_VOICE_SETTINGS: BrowserVoiceSettings = {
   voiceURI: "",
   rate: 0.95,
   pitch: 1.05,
 };
 
-function createConversation(title = "新会话"): AvatarConversation {
+function createConversation(title = "New session"): AvatarConversation {
   const now = Date.now();
   return {
     id: `${now}-${Math.random().toString(36).slice(2, 9)}`,
@@ -90,6 +95,7 @@ export default function AvatarWorkbench() {
   const [scenePresetId, setScenePresetId] = useState<ScenePresetId>("cc0-lounge");
   const [avatarModelUrl, setAvatarModelUrl] = useState(AVATAR_PRESETS[0].modelUrl);
   const [modelApiSettings, setModelApiSettings] = useState(DEFAULT_MODEL_API_SETTINGS);
+  const [uiLanguage, setUiLanguage] = useState<UiLanguage>("en");
 
   const lipSyncStopRef = useRef<(() => void) | null>(null);
   const modelAbortRef = useRef<AbortController | null>(null);
@@ -197,6 +203,10 @@ export default function AvatarWorkbench() {
         window.localStorage.removeItem(MODEL_API_SETTINGS_STORAGE_KEY);
       }
     }
+    const storedLanguage = window.localStorage.getItem(UI_LANGUAGE_STORAGE_KEY);
+    if (storedLanguage === "en" || storedLanguage === "zh") {
+      setUiLanguage(storedLanguage);
+    }
 
     setVoiceInputSupported(supportsBrowserSpeechRecognition());
     const storedVoiceOutput = window.localStorage.getItem(VOICE_OUTPUT_STORAGE_KEY);
@@ -266,12 +276,16 @@ export default function AvatarWorkbench() {
     if (isModelLoading) return;
     stopVoiceInput();
     cancelSpeech();
-    const session = createConversation(`新会话 ${sessions.length + 1}`);
+    const session = createConversation(
+      uiLanguage === "zh"
+        ? `新会话 ${sessions.length + 1}`
+        : `New session ${sessions.length + 1}`
+    );
     setSessions((current) => [...current, session]);
     setActiveSessionId(session.id);
     setExpression("comfort");
     setError(null);
-  }, [cancelSpeech, isModelLoading, sessions.length, stopVoiceInput]);
+  }, [cancelSpeech, isModelLoading, sessions.length, stopVoiceInput, uiLanguage]);
 
   const selectSession = useCallback((id: string) => {
     if (isModelLoading || id === activeSessionId) return;
@@ -537,9 +551,14 @@ export default function AvatarWorkbench() {
       JSON.stringify(normalized)
     );
   }, []);
+  const updateUiLanguage = useCallback((language: UiLanguage) => {
+    setUiLanguage(language);
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, language);
+  }, []);
 
   return (
-    <main className="relative h-dvh w-full overflow-hidden bg-slate-950">
+    <UiLanguageProvider language={uiLanguage} setLanguage={updateUiLanguage}>
+      <main className="relative h-dvh w-full overflow-hidden bg-slate-950">
       <AvatarStage
         state={state}
         mouthOpen={mouthOpen}
@@ -588,6 +607,7 @@ export default function AvatarWorkbench() {
           {error}
         </button>
       ) : null}
-    </main>
+      </main>
+    </UiLanguageProvider>
   );
 }

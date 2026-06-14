@@ -6,6 +6,7 @@ import {
   splitDialogueSentences,
 } from "@/lib/dialogue/splitDialogueSentences";
 import type { BrowserVoiceOption, BrowserVoiceSettings } from "@/lib/voice/browserSpeech";
+import { uiText, useUiLanguage } from "@/lib/i18n/uiLanguage";
 import type { SceneDialogueEntry } from "@/types/avatar";
 
 type PlaybackMode = "auto" | "manual";
@@ -55,6 +56,8 @@ export default function SceneDialogueOverlay({
   onSpeakSentence,
   onStopSpeech,
 }: SceneDialogueOverlayProps) {
+  const { language } = useUiLanguage();
+  const t = (en: string, zh: string) => uiText(language, en, zh);
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>("auto");
   const [displayStyle, setDisplayStyle] = useState<DisplayStyle>("subtitle");
   const [sentenceIndex, setSentenceIndex] = useState(0);
@@ -164,7 +167,7 @@ export default function SceneDialogueOverlay({
   const previousDialoguePanel = previousSentence ? (
     <div className="absolute left-4 top-4 max-w-[min(360px,42%)] rounded-xl border border-white/10 bg-slate-950/65 px-3 py-2 text-left shadow-lg backdrop-blur-md">
       <div className="mb-1 text-[9px] uppercase tracking-[0.2em] text-slate-500">
-        Nora · 上一句
+        Nora · {t("Previous", "上一句")}
       </div>
       <p className="line-clamp-3 text-[11px] leading-5 text-slate-300">
         {previousSentence}
@@ -181,7 +184,7 @@ export default function SceneDialogueOverlay({
             <div className="mb-1 text-[10px] uppercase tracking-[0.24em] text-cyan-200/80">
               Nora
             </div>
-            <p className="animate-pulse text-sm text-slate-300">正在组织回应...</p>
+            <p className="animate-pulse text-sm text-slate-300">{t("Preparing a response...", "正在组织回应...")}</p>
           </div>
         </div>
       );
@@ -210,7 +213,7 @@ export default function SceneDialogueOverlay({
                   event.currentTarget.form?.requestSubmit();
                 }
               }}
-              placeholder="在这里输入台词，Enter 发送，Shift+Enter 换行"
+              placeholder={t("Type here. Enter to send, Shift+Enter for a new line", "在这里输入台词，Enter 发送，Shift+Enter 换行")}
               rows={2}
               disabled={inputDisabled}
               className="min-w-0 flex-1 resize-none bg-transparent text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-500 disabled:opacity-60 sm:text-base"
@@ -219,7 +222,7 @@ export default function SceneDialogueOverlay({
               type="button"
               onClick={onToggleVoiceInput}
               disabled={!voiceInputSupported || inputDisabled}
-              title={voiceInputSupported ? "语音输入" : "当前浏览器不支持语音识别"}
+              title={voiceInputSupported ? t("Voice input", "语音输入") : t("Speech recognition is unavailable", "当前浏览器不支持语音识别")}
               className={[
                 "flex h-10 w-10 items-center justify-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-35",
                 voiceInputActive
@@ -232,18 +235,22 @@ export default function SceneDialogueOverlay({
             <button
               type="submit"
               disabled={!input.trim() || inputDisabled}
-              title="发送"
+              title={t("Send", "发送")}
               className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-300/25 bg-amber-400/10 text-amber-100 hover:bg-amber-400/20 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {loading ? <LoadingIcon /> : <SendIcon />}
             </button>
           </div>
           <div className="mt-2 flex items-center justify-between gap-3 text-[10px] text-slate-400">
-            <span>{voiceInputActive ? "正在识别，说完后可检查文字再发送" : "语音识别不会自动发送"}</span>
+            <span>
+              {voiceInputActive
+                ? t("Listening. Review the text before sending.", "正在识别，说完后可检查文字再发送")
+                : t("Voice input will not send automatically.", "语音识别不会自动发送")}
+            </span>
             <button
               type="button"
               onClick={onToggleVoiceOutput}
-              title={voiceOutputEnabled ? "关闭回复朗读" : "开启回复朗读"}
+              title={voiceOutputEnabled ? t("Disable speech", "关闭回复朗读") : t("Enable speech", "开启回复朗读")}
               className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 hover:bg-white/10"
             >
               <SpeakerIcon active={voiceOutputEnabled} />
@@ -251,7 +258,7 @@ export default function SceneDialogueOverlay({
             <button
               type="button"
               onClick={() => setShowVoiceSettings((current) => !current)}
-              title="声音设置"
+              title={t("Voice settings", "声音设置")}
               className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 hover:bg-white/10"
             >
               <SlidersIcon />
@@ -262,7 +269,7 @@ export default function SceneDialogueOverlay({
               voices={voices}
               settings={voiceSettings}
               onChange={onVoiceSettingsChange}
-              onPreview={() => void onSpeakSentence("你好，我是 Nora，很高兴陪你聊聊天。")}
+              onPreview={() => void onSpeakSentence(t("Hello, I'm Nora. It's lovely to meet you.", "你好，我是 Nora，很高兴陪你聊聊天。"))}
             />
           ) : null}
         </form>
@@ -279,7 +286,7 @@ export default function SceneDialogueOverlay({
         <button
           type="button"
           onClick={onToggleVoiceOutput}
-          title={voiceOutputEnabled ? "关闭声音" : "开启声音"}
+          title={voiceOutputEnabled ? t("Mute", "关闭声音") : t("Enable voice", "开启声音")}
           className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"
         >
           <SpeakerIcon active={voiceOutputEnabled} />
@@ -287,7 +294,7 @@ export default function SceneDialogueOverlay({
         <button
           type="button"
           onClick={() => setShowVoiceSettings((current) => !current)}
-          title="音色设置"
+          title={t("Voice settings", "音色设置")}
           className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"
         >
           <SlidersIcon />
@@ -295,7 +302,7 @@ export default function SceneDialogueOverlay({
         <button
           type="button"
           onClick={() => setStyle(displayStyle === "subtitle" ? "bubble" : "subtitle")}
-          title={displayStyle === "subtitle" ? "切换为气泡" : "切换为字幕"}
+          title={displayStyle === "subtitle" ? t("Use speech bubble", "切换为气泡") : t("Use subtitles", "切换为字幕")}
           className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"
         >
           {displayStyle === "subtitle" ? <SubtitleIcon /> : <BubbleIcon />}
@@ -303,7 +310,7 @@ export default function SceneDialogueOverlay({
         <button
           type="button"
           onClick={() => setMode(playbackMode === "auto" ? "manual" : "auto")}
-          title={playbackMode === "auto" ? "切换为手动" : "切换为自动"}
+          title={playbackMode === "auto" ? t("Use manual playback", "切换为手动") : t("Use automatic playback", "切换为自动")}
           className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"
         >
           {playbackMode === "auto" ? <AutoIcon /> : <ManualIcon />}
@@ -316,7 +323,7 @@ export default function SceneDialogueOverlay({
             voices={voices}
             settings={voiceSettings}
             onChange={onVoiceSettingsChange}
-            onPreview={() => void onSpeakSentence("你好，我是 Nora，很高兴陪你聊聊天。")}
+            onPreview={() => void onSpeakSentence(t("Hello, I'm Nora. It's lovely to meet you.", "你好，我是 Nora，很高兴陪你聊聊天。"))}
           />
         </div>
       ) : null}
@@ -365,13 +372,13 @@ export default function SceneDialogueOverlay({
                     : "border-cyan-300/25 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20"
                 }`}
               >
-                {isLastSentence ? "完成并关闭" : "确认，下一句"}
+                {isLastSentence ? t("Finish", "完成并关闭") : t("Next", "确认，下一句")}
               </button>
             )}
             {playbackMode === "auto" && (
               <span>
-                {isLastSentence ? "即将关闭" : "下一句"}约{" "}
-                {(getSentenceDisplayDuration(sentences[sentenceIndex]) / 1000).toFixed(1)} 秒
+                {isLastSentence ? t("Closing in", "即将关闭") : t("Next in", "下一句约")}{" "}
+                {(getSentenceDisplayDuration(sentences[sentenceIndex]) / 1000).toFixed(1)} {t("sec", "秒")}
               </span>
             )}
           </div>
@@ -392,26 +399,28 @@ function VoiceSettingsPanel({
   onChange: (settings: BrowserVoiceSettings) => void;
   onPreview: () => void;
 }) {
+  const { language } = useUiLanguage();
+  const t = (en: string, zh: string) => uiText(language, en, zh);
   return (
     <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/90 p-3 text-left text-[11px] text-slate-300 shadow-xl backdrop-blur">
       <label className="block">
-        <span className="mb-1 block text-slate-400">系统音色</span>
+        <span className="mb-1 block text-slate-400">{t("System voice", "系统音色")}</span>
         <select
           value={settings.voiceURI}
           onChange={(event) => onChange({ ...settings, voiceURI: event.target.value })}
           className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-slate-100 outline-none"
         >
-          <option value="">自动选择中文音色</option>
+          <option value="">{t("Automatic voice", "自动选择中文音色")}</option>
           {voices.map((voice) => (
             <option key={voice.voiceURI} value={voice.voiceURI}>
-              {voice.name} ({voice.lang}){voice.localService ? "" : " · 在线"}
+              {voice.name} ({voice.lang}){voice.localService ? "" : ` · ${t("Online", "在线")}`}
             </option>
           ))}
         </select>
       </label>
       <label className="mt-3 block">
         <span className="flex justify-between text-slate-400">
-          <span>语速</span>
+          <span>{t("Rate", "语速")}</span>
           <span>{settings.rate.toFixed(2)}x</span>
         </span>
         <input
@@ -426,7 +435,7 @@ function VoiceSettingsPanel({
       </label>
       <label className="mt-3 block">
         <span className="flex justify-between text-slate-400">
-          <span>音高</span>
+          <span>{t("Pitch", "音高")}</span>
           <span>{settings.pitch.toFixed(2)}</span>
         </span>
         <input
@@ -440,14 +449,17 @@ function VoiceSettingsPanel({
         />
       </label>
       <p className="mt-2 leading-4 text-slate-500">
-        音色来自操作系统和浏览器。Edge 通常会提供更多在线中文音色。
+        {t(
+          "Voices are provided by your operating system and browser. Edge often provides more online voices.",
+          "音色来自操作系统和浏览器。Edge 通常会提供更多在线中文音色。"
+        )}
       </p>
       <button
         type="button"
         onClick={onPreview}
         className="mt-3 w-full rounded-lg border border-cyan-300/20 bg-cyan-400/10 px-3 py-2 text-cyan-100 hover:bg-cyan-400/20"
       >
-        试听当前设置
+        {t("Preview", "试听当前设置")}
       </button>
     </div>
   );
