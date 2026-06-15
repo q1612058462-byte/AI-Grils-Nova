@@ -30,7 +30,9 @@ type SceneDialogueOverlayProps = {
   onToggleVoiceOutput: () => void;
   onVoiceSettingsChange: (settings: BrowserVoiceSettings) => void;
   onSpeakSentence: (sentence: string) => Promise<void>;
+  onPrefetchSentence: (sentence: string) => void;
   onStopSpeech: () => void;
+  onSentenceChange: (sentence: string, index: number) => void;
 };
 
 const MODE_STORAGE_KEY = "avatar.dialoguePlaybackMode.v1";
@@ -54,7 +56,9 @@ export default function SceneDialogueOverlay({
   onToggleVoiceOutput,
   onVoiceSettingsChange,
   onSpeakSentence,
+  onPrefetchSentence,
   onStopSpeech,
+  onSentenceChange,
 }: SceneDialogueOverlayProps) {
   const { language } = useUiLanguage();
   const t = (en: string, zh: string) => uiText(language, en, zh);
@@ -88,6 +92,21 @@ export default function SceneDialogueOverlay({
   useEffect(() => {
     setSentenceIndex((current) => Math.min(current, Math.max(0, sentences.length - 1)));
   }, [sentences.length]);
+
+  useEffect(() => {
+    const sentence = sentences[sentenceIndex];
+    if (!sentence || isUser) return;
+    onSentenceChange(sentence, sentenceIndex);
+    const nextSentence = sentences[sentenceIndex + 1];
+    if (voiceOutputEnabled && nextSentence) onPrefetchSentence(nextSentence);
+  }, [
+    isUser,
+    onPrefetchSentence,
+    onSentenceChange,
+    sentenceIndex,
+    sentences,
+    voiceOutputEnabled,
+  ]);
 
   useEffect(() => {
     if (
@@ -376,6 +395,7 @@ export default function SceneDialogueOverlay({
               <button
                 type="button"
                 onClick={() => {
+                  onStopSpeech();
                   if (isLastSentence) onDismiss();
                   else setSentenceIndex((current) => current + 1);
                 }}
@@ -527,9 +547,16 @@ function VoiceSettingsPanel({
                   <input
                     value={settings.cloudVoice}
                     onChange={(event) => onChange({ ...settings, cloudVoice: event.target.value })}
+                    list="doubao-speaker-ids"
                     placeholder="zh_female_vv_uranus_bigtts"
                     className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-slate-100 outline-none"
                   />
+                  <datalist id="doubao-speaker-ids">
+                    <option value="zh_female_vv_uranus_bigtts">Vivi / Female</option>
+                    <option value="zh_female_tianmeixiaoyuan_uranus_bigtts">
+                      Sweet Campus / Female
+                    </option>
+                  </datalist>
                 </label>
               </div>
             </>

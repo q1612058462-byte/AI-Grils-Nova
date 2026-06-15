@@ -38,7 +38,9 @@ type AvatarStageProps = {
   onToggleVoiceOutput: () => void;
   onVoiceSettingsChange: (settings: BrowserVoiceSettings) => void;
   onSpeakSentence: (sentence: string) => Promise<void>;
+  onPrefetchSentence: (sentence: string) => void;
   onStopSpeech: () => void;
+  onSentenceChange: (sentence: string, index: number) => void;
   sessions: AvatarConversation[];
   activeSession: AvatarConversation;
   sessionBusy: boolean;
@@ -75,7 +77,9 @@ export default function AvatarStage({
   onToggleVoiceOutput,
   onVoiceSettingsChange,
   onSpeakSentence,
+  onPrefetchSentence,
   onStopSpeech,
+  onSentenceChange,
   sessions,
   activeSession,
   sessionBusy,
@@ -148,7 +152,9 @@ export default function AvatarStage({
           onToggleVoiceOutput={onToggleVoiceOutput}
           onVoiceSettingsChange={onVoiceSettingsChange}
           onSpeakSentence={onSpeakSentence}
+          onPrefetchSentence={onPrefetchSentence}
           onStopSpeech={onStopSpeech}
+          onSentenceChange={onSentenceChange}
         />
         </div>
         <aside

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AvatarStage from "@/components/AvatarStage";
 import {
+  deriveExpressionFromText,
   getSpeakableText,
   parseAvatarResponse,
 } from "@/lib/avatar/expressionMapper";
@@ -20,6 +21,7 @@ import {
   UiLanguageProvider,
   type UiLanguage,
 } from "@/lib/i18n/uiLanguage";
+import { splitDialogueSentences } from "@/lib/dialogue/splitDialogueSentences";
 import {
   createBrowserSpeechRecognition,
   getBrowserVoices,
@@ -29,7 +31,10 @@ import {
   type BrowserVoiceOption,
   type BrowserVoiceSettings,
 } from "@/lib/voice/browserSpeech";
-import { speakWithCloud } from "@/lib/voice/cloudSpeech";
+import {
+  prefetchCloudSpeech,
+  speakWithCloud,
+} from "@/lib/voice/cloudSpeech";
 import type {
   AvatarConversation,
   AvatarExpression,
@@ -116,6 +121,8 @@ export default function AvatarWorkbench() {
   const modelAbortRef = useRef<AbortController | null>(null);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const speechCancelRef = useRef<(() => void) | null>(null);
+  const speechGenerationRef = useRef(0);
+  const sentenceExpressionRef = useRef<AvatarExpression>("smile");
   const cloudTtsUnavailableRef = useRef(false);
 
   const nextId = useMemo(() => {
@@ -155,8 +162,10 @@ export default function AvatarWorkbench() {
   }, []);
 
   const cancelSpeech = useCallback(() => {
-    speechCancelRef.current?.();
+    speechGenerationRef.current += 1;
+    const cancelActiveSpeech = speechCancelRef.current;
     speechCancelRef.current = null;
+    cancelActiveSpeech?.();
     stopLipSync();
     setState((current) => current === "speaking" ? "idle" : current);
   }, [stopLipSync]);
@@ -460,6 +469,7 @@ export default function AvatarWorkbench() {
 
   const speakSentence = useCallback(async (text: string) => {
     cancelSpeech();
+    const speechGeneration = ++speechGenerationRef.current;
     const speakableText = getSpeakableText(text);
     if (!speakableText) {
       setState("idle");
@@ -468,11 +478,13 @@ export default function AvatarWorkbench() {
 
     const playbackHandlers = {
       onStart: () => {
+        if (speechGenerationRef.current !== speechGeneration) return;
         setState("speaking");
         lipSyncStopRef.current?.();
         lipSyncStopRef.current = startFakeLipSync(setMouthOpen);
       },
       onEnd: () => {
+        if (speechGenerationRef.current !== speechGeneration) return;
         speechCancelRef.current = null;
         stopLipSync();
         setState("idle");
@@ -485,10 +497,15 @@ export default function AvatarWorkbench() {
 
       try {
         await cloudPlayback.promise;
-        speechCancelRef.current = null;
+        if (speechGenerationRef.current === speechGeneration) {
+          speechCancelRef.current = null;
+        }
         return;
       } catch (cloudError) {
-        if (cloudPlayback.wasCancelled()) return;
+        if (
+          cloudPlayback.wasCancelled() ||
+          speechGenerationRef.current !== speechGeneration
+        ) return;
         cloudTtsUnavailableRef.current = true;
         setError(
           cloudError instanceof Error
@@ -509,6 +526,35 @@ export default function AvatarWorkbench() {
     speechCancelRef.current = playback.cancel;
     await playback.promise;
   }, [cancelSpeech, stopLipSync, voiceSettings]);
+
+  const prefetchSentence = useCallback((text: string) => {
+    if (cloudTtsUnavailableRef.current) return;
+    const speakableText = getSpeakableText(text);
+    if (speakableText) prefetchCloudSpeech(speakableText, voiceSettings);
+  }, [voiceSettings]);
+
+  const updateSentenceExpression = useCallback((
+    text: string,
+    sentenceIndex: number
+  ) => {
+    const expressionCycle: AvatarExpression[] = [
+      "smile",
+      "serious",
+      "happy",
+      "comfort",
+      "surprised",
+    ];
+    let nextExpression = deriveExpressionFromText(
+      text,
+      expressionCycle[sentenceIndex % expressionCycle.length]
+    );
+    if (nextExpression === sentenceExpressionRef.current) {
+      nextExpression =
+        expressionCycle[(sentenceIndex + 1) % expressionCycle.length];
+    }
+    sentenceExpressionRef.current = nextExpression;
+    setExpression(nextExpression);
+  }, []);
 
   const handleModelSubmit = async () => {
     const targetSession = activeSession;
@@ -548,6 +594,7 @@ export default function AvatarWorkbench() {
     const controller = new AbortController();
     modelAbortRef.current = controller;
     let reply = "";
+    let firstSentencePrefetched = false;
 
     try {
       const response = await fetch("/api/chat", {
@@ -602,6 +649,17 @@ export default function AvatarWorkbench() {
               updatedAt: Date.now(),
             }));
             setExpression(parsedReply.expression);
+
+            if (!firstSentencePrefetched) {
+              const firstSentence = splitDialogueSentences(parsedReply.text)[0];
+              if (
+                firstSentence &&
+                /[。！？!?."”’）】)]$/.test(firstSentence)
+              ) {
+                firstSentencePrefetched = true;
+                prefetchSentence(firstSentence);
+              }
+            }
           }
         }
       }
@@ -693,7 +751,9 @@ export default function AvatarWorkbench() {
         onToggleVoiceOutput={toggleVoiceOutput}
         onVoiceSettingsChange={updateVoiceSettings}
         onSpeakSentence={speakSentence}
+        onPrefetchSentence={prefetchSentence}
         onStopSpeech={cancelSpeech}
+        onSentenceChange={updateSentenceExpression}
         sessions={sessions}
         activeSession={activeSession}
         sessionBusy={isModelLoading}
