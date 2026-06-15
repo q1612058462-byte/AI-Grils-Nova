@@ -139,15 +139,18 @@ visit.
 Select the **Voice Sliders** button from either the input panel or active-dialogue toolbar.
 
 - **Voice Engine** switches between natural cloud speech and the browser's system speech.
-- **Natural Cloud Voice** sends each displayed sentence through an OpenAI-compatible
-  `/audio/speech` endpoint and plays the generated audio.
+- **Natural Cloud Voice** sends each displayed sentence to the selected cloud provider and plays
+  the generated audio. Doubao Speech Synthesis 2.0 is the default provider.
+- **Cloud Provider** switches between Doubao Speech Synthesis 2.0 and an OpenAI-compatible
+  `/audio/speech` endpoint.
 - **System Browser Voice** uses voices supplied by the operating system and browser as a free,
   offline-friendly fallback.
-- **Model** selects the cloud TTS model. The default is `gpt-4o-mini-tts`.
-- **Voice** selects a cloud voice such as `marin`, `cedar`, `coral`, or another voice supported by
-  the configured provider.
-- **Speaking Style** describes the intended tone, pacing, emotion, and delivery for models that
-  support voice instructions.
+- **Doubao API Key** uses the API Key issued by the current Volcengine console.
+- **App ID / Access Token** provides compatibility with credentials from the legacy console.
+- **Resource ID** selects the Doubao service resource. Speech Synthesis 2.0 uses `seed-tts-2.0`.
+- **Speaker ID** selects a voice enabled for the Volcengine account.
+- **Model / Voice / Speaking Style** configure an OpenAI-compatible provider when that option is
+  selected.
 - **System Voice** selects from installed operating-system voices when the browser engine is active.
 - **Automatic Voice** lets the application choose a suitable installed voice.
 - **Rate** controls speaking speed from `0.5x` to `1.6x`.
@@ -160,10 +163,10 @@ playback remain synchronized with the audio. If cloud generation fails or is not
 reports the problem once and falls back to the system voice for the rest of the page session.
 Active dialogue is labeled as AI voice output so users know the audio is synthetic.
 
-Voice settings and the speaker on/off state are stored locally in the browser. A cloud API key
-entered in the page is also stored in browser `localStorage`; use server-side environment variables
-on shared devices. Microsoft Edge often exposes more system voices than other browsers. Speech
-recognition and microphone access work most reliably on `localhost` or an HTTPS deployment.
+Voice settings and the speaker on/off state are stored locally in the browser. Cloud credentials
+entered in the page are also stored in browser `localStorage`; use server-side environment
+variables on shared devices. Microsoft Edge often exposes more system voices than other browsers.
+Speech recognition and microphone access work most reliably on `localhost` or an HTTPS deployment.
 
 ### Expressions And Non-Spoken Cues
 
@@ -674,7 +677,27 @@ Then restart the server and verify:
 
 ## Voice Support
 
-Natural cloud TTS is configured independently from the chat model:
+Natural cloud TTS is configured independently from the chat model. Doubao Speech Synthesis 2.0 is
+the default:
+
+```env
+# Current Volcengine console credential
+DOUBAO_TTS_API_KEY=your-volcengine-api-key
+DOUBAO_TTS_BASE_URL=https://openspeech.bytedance.com/api/v3/tts/unidirectional
+DOUBAO_TTS_RESOURCE_ID=seed-tts-2.0
+DOUBAO_TTS_SPEAKER=your-enabled-speaker-id
+
+# Legacy console alternative
+DOUBAO_TTS_APP_ID=
+DOUBAO_TTS_ACCESS_TOKEN=
+```
+
+The server sends the V3 request with `X-Api-Resource-Id: seed-tts-2.0`, then decodes and combines
+the Base64 audio chunks returned by Volcengine. The configured Speaker ID must already be enabled
+for the account. See the
+[Doubao Speech Synthesis 2.0 documentation](https://www.volcengine.com/docs/6561/1329505).
+
+An OpenAI-compatible provider remains available:
 
 ```env
 TTS_API_KEY=your-tts-provider-key
@@ -684,11 +707,14 @@ TTS_VOICE=marin
 TTS_INSTRUCTIONS=Speak naturally in a warm, gentle, conversational tone.
 ```
 
-The server appends `/audio/speech` unless the configured URL already ends with that path. The
-in-page Voice Settings panel can override the Base URL, API key, model, voice, speed, and speaking
-style for the current browser.
+For the OpenAI-compatible provider, the server appends `/audio/speech` unless the configured URL
+already ends with that path. The in-page Voice Settings panel can override the provider, Base URL,
+credentials, resource/model, voice, and speed for the current browser.
 
 - Cloud TTS audio is generated and played sentence by sentence.
+- Doubao supports both current API Key authentication and legacy App ID + Access Token
+  authentication.
+- Doubao UI speed is converted to the V3 `speech_rate` range.
 - `TTS_API_KEY` falls back to `OPENAI_API_KEY` when omitted.
 - Older `tts-1` models automatically omit unsupported speaking-style instructions.
 - Browser `speechSynthesis` remains available as a fallback.

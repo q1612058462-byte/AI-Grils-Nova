@@ -45,13 +45,17 @@ const MODEL_API_SETTINGS_STORAGE_KEY = "avatar.modelApiSettings.v1";
 const UI_LANGUAGE_STORAGE_KEY = "avatar.uiLanguage.v1";
 const DEFAULT_VOICE_SETTINGS: BrowserVoiceSettings = {
   engine: "cloud",
+  cloudProvider: "doubao",
   voiceURI: "",
   cloudBaseUrl: "",
   cloudApiKey: "",
-  cloudModel: "gpt-4o-mini-tts",
-  cloudVoice: "marin",
+  cloudModel: "seed-tts-2.0",
+  cloudVoice: "zh_female_vv_uranus_bigtts",
   cloudInstructions:
     "Speak naturally in a warm, gentle, conversational tone. Use expressive but restrained intonation and clear pauses.",
+  doubaoAppId: "",
+  doubaoAccessToken: "",
+  doubaoResourceId: "seed-tts-2.0",
   rate: 0.95,
   pitch: 1.05,
 };
@@ -231,11 +235,18 @@ export default function AvatarWorkbench() {
     if (storedVoiceSettings) {
       try {
         const parsed = JSON.parse(storedVoiceSettings) as Partial<BrowserVoiceSettings>;
+        const cloudProvider =
+          parsed.cloudProvider === "openai" || parsed.cloudProvider === "doubao"
+            ? parsed.cloudProvider
+            : parsed.cloudModel === "gpt-4o-mini-tts" || parsed.cloudVoice === "marin"
+              ? "openai"
+              : DEFAULT_VOICE_SETTINGS.cloudProvider;
         setVoiceSettings({
           engine:
             parsed.engine === "browser" || parsed.engine === "cloud"
               ? parsed.engine
               : DEFAULT_VOICE_SETTINGS.engine,
+          cloudProvider,
           voiceURI: typeof parsed.voiceURI === "string" ? parsed.voiceURI : "",
           cloudBaseUrl:
             typeof parsed.cloudBaseUrl === "string" ? parsed.cloudBaseUrl : "",
@@ -244,15 +255,27 @@ export default function AvatarWorkbench() {
           cloudModel:
             typeof parsed.cloudModel === "string" && parsed.cloudModel.trim()
               ? parsed.cloudModel
-              : DEFAULT_VOICE_SETTINGS.cloudModel,
+              : cloudProvider === "doubao"
+                ? "seed-tts-2.0"
+                : "gpt-4o-mini-tts",
           cloudVoice:
             typeof parsed.cloudVoice === "string" && parsed.cloudVoice.trim()
               ? parsed.cloudVoice
-              : DEFAULT_VOICE_SETTINGS.cloudVoice,
+              : cloudProvider === "doubao"
+                ? "zh_female_vv_uranus_bigtts"
+                : "marin",
           cloudInstructions:
             typeof parsed.cloudInstructions === "string"
               ? parsed.cloudInstructions
               : DEFAULT_VOICE_SETTINGS.cloudInstructions,
+          doubaoAppId:
+            typeof parsed.doubaoAppId === "string" ? parsed.doubaoAppId : "",
+          doubaoAccessToken:
+            typeof parsed.doubaoAccessToken === "string" ? parsed.doubaoAccessToken : "",
+          doubaoResourceId:
+            typeof parsed.doubaoResourceId === "string" && parsed.doubaoResourceId.trim()
+              ? parsed.doubaoResourceId
+              : DEFAULT_VOICE_SETTINGS.doubaoResourceId,
           rate: typeof parsed.rate === "number" ? parsed.rate : DEFAULT_VOICE_SETTINGS.rate,
           pitch: typeof parsed.pitch === "number" ? parsed.pitch : DEFAULT_VOICE_SETTINGS.pitch,
         });
@@ -416,12 +439,17 @@ export default function AvatarWorkbench() {
   const updateVoiceSettings = useCallback((settings: BrowserVoiceSettings) => {
     const normalized = {
       engine: settings.engine,
+      cloudProvider: settings.cloudProvider,
       voiceURI: settings.voiceURI,
       cloudBaseUrl: settings.cloudBaseUrl.trim(),
       cloudApiKey: settings.cloudApiKey.trim(),
       cloudModel: settings.cloudModel.trim() || DEFAULT_VOICE_SETTINGS.cloudModel,
       cloudVoice: settings.cloudVoice.trim() || DEFAULT_VOICE_SETTINGS.cloudVoice,
       cloudInstructions: settings.cloudInstructions.trim(),
+      doubaoAppId: settings.doubaoAppId.trim(),
+      doubaoAccessToken: settings.doubaoAccessToken.trim(),
+      doubaoResourceId:
+        settings.doubaoResourceId.trim() || DEFAULT_VOICE_SETTINGS.doubaoResourceId,
       rate: Math.min(1.6, Math.max(0.5, settings.rate)),
       pitch: Math.min(1.6, Math.max(0.5, settings.pitch)),
     };

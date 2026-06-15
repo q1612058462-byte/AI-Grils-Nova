@@ -1,22 +1,26 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
 type TtsSettings = {
+  provider?: unknown;
   baseUrl?: unknown;
   apiKey?: unknown;
   model?: unknown;
   voice?: unknown;
   instructions?: unknown;
+  appId?: unknown;
+  accessToken?: unknown;
+  resourceId?: unknown;
   speed?: unknown;
 };
 
-function getSpeechUrl(baseUrl: string) {
-  const normalized = baseUrl.replace(/\/+$/, "");
-  return normalized.endsWith("/audio/speech")
-    ? normalized
-    : `${normalized}/audio/speech`;
-}
+type DoubaoChunk = {
+  code?: number;
+  message?: string;
+  data?: string;
+};
 
 function getString(value: unknown, fallback: string, maxLength = 4096) {
   return typeof value === "string" && value.trim()
@@ -26,8 +30,305 @@ function getString(value: unknown, fallback: string, maxLength = 4096) {
 
 function getSpeed(value: unknown) {
   return typeof value === "number" && Number.isFinite(value)
-    ? Math.min(4, Math.max(0.25, value))
+    ? Math.min(1.6, Math.max(0.5, value))
     : 1;
+}
+
+function validateBaseUrl(baseUrl: string) {
+  let parsedBaseUrl: URL;
+  try {
+    parsedBaseUrl = new URL(baseUrl);
+  } catch {
+    return "The TTS Base URL is invalid.";
+  }
+
+  const isLocalHttp =
+    parsedBaseUrl.protocol === "http:" &&
+    (parsedBaseUrl.hostname === "localhost" ||
+      parsedBaseUrl.hostname === "127.0.0.1");
+  return parsedBaseUrl.protocol === "https:" || isLocalHttp
+    ? null
+    : "The TTS Base URL must use HTTPS, except for localhost development.";
+}
+
+function getOpenAiSpeechUrl(baseUrl: string) {
+  const normalized = baseUrl.replace(/\/+$/, "");
+  return normalized.endsWith("/audio/speech")
+    ? normalized
+    : `${normalized}/audio/speech`;
+}
+
+async function createOpenAiSpeech(
+  request: Request,
+  text: string,
+  settings: TtsSettings
+) {
+  const apiKey =
+    getString(settings.apiKey, "") ||
+    process.env.TTS_API_KEY ||
+    process.env.OPENAI_API_KEY;
+  const baseUrl = getString(
+    settings.baseUrl,
+    process.env.TTS_BASE_URL || "https://api.openai.com/v1",
+    2048
+  );
+  const model = getString(
+    settings.model,
+    process.env.TTS_MODEL || "gpt-4o-mini-tts",
+    128
+  );
+  const voice = getString(
+    settings.voice,
+    process.env.TTS_VOICE || "marin",
+    128
+  );
+  const instructions = getString(
+    settings.instructions,
+    process.env.TTS_INSTRUCTIONS ||
+      "Speak naturally in a warm, gentle, conversational tone. Use expressive but restrained intonation and clear pauses.",
+    4096
+  );
+
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "OpenAI-compatible TTS is not configured. Add TTS_API_KEY." },
+      { status: 503 }
+    );
+  }
+
+  const baseUrlError = validateBaseUrl(baseUrl);
+  if (baseUrlError) {
+    return NextResponse.json({ error: baseUrlError }, { status: 400 });
+  }
+
+  const speechPayload: Record<string, string | number> = {
+    model,
+    input: text,
+    voice,
+    response_format: "mp3",
+    speed: getSpeed(settings.speed),
+  };
+  if (instructions && !/^tts-1(?:$|-)/i.test(model)) {
+    speechPayload.instructions = instructions;
+  }
+
+  const upstream = await fetch(getOpenAiSpeechUrl(baseUrl), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(speechPayload),
+    signal: request.signal,
+  });
+
+  if (!upstream.ok || !upstream.body) {
+    return upstreamError(upstream, "OpenAI-compatible TTS");
+  }
+
+  return new Response(upstream.body, {
+    status: 200,
+    headers: {
+      "Content-Type": upstream.headers.get("Content-Type") || "audio/mpeg",
+      "Cache-Control": "no-store",
+      "X-TTS-Provider": "openai",
+      "X-TTS-Model": model,
+      "X-TTS-Voice": voice,
+    },
+  });
+}
+
+async function createDoubaoSpeech(
+  request: Request,
+  text: string,
+  settings: TtsSettings
+) {
+  const apiKey =
+    getString(settings.apiKey, "") ||
+    process.env.DOUBAO_TTS_API_KEY;
+  const appId =
+    getString(settings.appId, "") ||
+    process.env.DOUBAO_TTS_APP_ID ||
+    "";
+  const accessToken =
+    getString(settings.accessToken, "") ||
+    process.env.DOUBAO_TTS_ACCESS_TOKEN ||
+    "";
+  const baseUrl = getString(
+    settings.baseUrl,
+    process.env.DOUBAO_TTS_BASE_URL ||
+      "https://openspeech.bytedance.com/api/v3/tts/unidirectional",
+    2048
+  );
+  const resourceId = getString(
+    settings.resourceId,
+    process.env.DOUBAO_TTS_RESOURCE_ID || "seed-tts-2.0",
+    128
+  );
+  const speaker = getString(
+    settings.voice,
+    process.env.DOUBAO_TTS_SPEAKER || "zh_female_vv_uranus_bigtts",
+    256
+  );
+
+  if (!apiKey && !(appId && accessToken)) {
+    return NextResponse.json(
+      {
+        error:
+          "Doubao TTS is not configured. Add DOUBAO_TTS_API_KEY, or use DOUBAO_TTS_APP_ID with DOUBAO_TTS_ACCESS_TOKEN.",
+      },
+      { status: 503 }
+    );
+  }
+
+  const baseUrlError = validateBaseUrl(baseUrl);
+  if (baseUrlError) {
+    return NextResponse.json({ error: baseUrlError }, { status: 400 });
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "X-Api-Resource-Id": resourceId,
+    "X-Api-Request-Id": randomUUID(),
+  };
+  if (apiKey) {
+    headers["X-Api-Key"] = apiKey;
+  } else {
+    headers["X-Api-App-Id"] = appId;
+    headers["X-Api-Access-Key"] = accessToken;
+  }
+
+  const speechRate = Math.round((getSpeed(settings.speed) - 1) * 100);
+  const upstream = await fetch(baseUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      user: {
+        uid: "nora-web-avatar",
+      },
+      req_params: {
+        text,
+        speaker,
+        audio_params: {
+          format: "mp3",
+          sample_rate: 24000,
+          speech_rate: Math.min(100, Math.max(-50, speechRate)),
+        },
+      },
+    }),
+    signal: request.signal,
+  });
+
+  if (!upstream.ok || !upstream.body) {
+    return upstreamError(upstream, "Doubao TTS");
+  }
+
+  const contentType = upstream.headers.get("Content-Type") || "";
+  if (contentType.startsWith("audio/")) {
+    return new Response(upstream.body, {
+      status: 200,
+      headers: doubaoResponseHeaders(contentType, resourceId, speaker),
+    });
+  }
+
+  const responseText = await upstream.text();
+  const chunks = parseJsonObjects(responseText);
+  const audioParts: Buffer[] = [];
+
+  for (const chunk of chunks) {
+    if (typeof chunk.code === "number" && chunk.code !== 0) {
+      return NextResponse.json(
+        {
+          error: `Doubao TTS returned code ${chunk.code}.`,
+          details: chunk.message || responseText.slice(0, 1000),
+        },
+        { status: 502 }
+      );
+    }
+    if (chunk.data) audioParts.push(Buffer.from(chunk.data, "base64"));
+  }
+
+  if (audioParts.length === 0) {
+    return NextResponse.json(
+      {
+        error: "Doubao TTS returned no audio data.",
+        details: responseText.slice(0, 1000),
+      },
+      { status: 502 }
+    );
+  }
+
+  return new Response(Buffer.concat(audioParts), {
+    status: 200,
+    headers: doubaoResponseHeaders("audio/mpeg", resourceId, speaker),
+  });
+}
+
+function doubaoResponseHeaders(
+  contentType: string,
+  resourceId: string,
+  speaker: string
+) {
+  return {
+    "Content-Type": contentType,
+    "Cache-Control": "no-store",
+    "X-TTS-Provider": "doubao",
+    "X-TTS-Model": resourceId,
+    "X-TTS-Voice": speaker,
+  };
+}
+
+function parseJsonObjects(value: string): DoubaoChunk[] {
+  const objects: DoubaoChunk[] = [];
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === "\"") inString = false;
+      continue;
+    }
+
+    if (character === "\"") {
+      inString = true;
+      continue;
+    }
+    if (character === "{") {
+      if (depth === 0) start = index;
+      depth += 1;
+      continue;
+    }
+    if (character !== "}") continue;
+
+    depth -= 1;
+    if (depth !== 0 || start < 0) continue;
+
+    try {
+      objects.push(JSON.parse(value.slice(start, index + 1)) as DoubaoChunk);
+    } catch {
+      // Skip malformed transport fragments and continue scanning.
+    }
+    start = -1;
+  }
+
+  return objects;
+}
+
+async function upstreamError(upstream: Response, provider: string) {
+  const details = await upstream.text();
+  return NextResponse.json(
+    {
+      error: `${provider} request failed with status ${upstream.status}.`,
+      details,
+    },
+    { status: upstream.status }
+  );
 }
 
 export async function POST(request: Request) {
@@ -42,98 +343,9 @@ export async function POST(request: Request) {
     }
 
     const settings = body.settings ?? {};
-    const apiKey =
-      getString(settings.apiKey, "") ||
-      process.env.TTS_API_KEY ||
-      process.env.OPENAI_API_KEY;
-    const baseUrl = getString(
-      settings.baseUrl,
-      process.env.TTS_BASE_URL || "https://api.openai.com/v1",
-      2048
-    );
-    const model = getString(
-      settings.model,
-      process.env.TTS_MODEL || "gpt-4o-mini-tts",
-      128
-    );
-    const voice = getString(
-      settings.voice,
-      process.env.TTS_VOICE || "marin",
-      128
-    );
-    const instructions = getString(
-      settings.instructions,
-      process.env.TTS_INSTRUCTIONS ||
-        "Speak naturally in a warm, gentle, conversational tone. Use expressive but restrained intonation and clear pauses.",
-      4096
-    );
-
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "Cloud TTS is not configured. Add TTS_API_KEY or select browser speech." },
-        { status: 503 }
-      );
-    }
-
-    let parsedBaseUrl: URL;
-    try {
-      parsedBaseUrl = new URL(baseUrl);
-    } catch {
-      return NextResponse.json({ error: "The TTS Base URL is invalid." }, { status: 400 });
-    }
-
-    const isLocalHttp =
-      parsedBaseUrl.protocol === "http:" &&
-      (parsedBaseUrl.hostname === "localhost" ||
-        parsedBaseUrl.hostname === "127.0.0.1");
-    if (parsedBaseUrl.protocol !== "https:" && !isLocalHttp) {
-      return NextResponse.json(
-        { error: "The TTS Base URL must use HTTPS, except for localhost development." },
-        { status: 400 }
-      );
-    }
-
-    const speechPayload: Record<string, string | number> = {
-      model,
-      input: text,
-      voice,
-      response_format: "mp3",
-      speed: getSpeed(settings.speed),
-    };
-    if (instructions && !/^tts-1(?:$|-)/i.test(model)) {
-      speechPayload.instructions = instructions;
-    }
-
-    const upstream = await fetch(getSpeechUrl(baseUrl), {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(speechPayload),
-      signal: request.signal,
-    });
-
-    if (!upstream.ok || !upstream.body) {
-      const details = await upstream.text();
-      return NextResponse.json(
-        {
-          error: `Cloud TTS request failed with status ${upstream.status}.`,
-          details,
-        },
-        { status: upstream.status }
-      );
-    }
-
-    return new Response(upstream.body, {
-      status: 200,
-      headers: {
-        "Content-Type": upstream.headers.get("Content-Type") || "audio/mpeg",
-        "Cache-Control": "no-store",
-        "X-TTS-Model": model,
-        "X-TTS-Voice": voice,
-      },
-    });
+    return settings.provider === "openai"
+      ? createOpenAiSpeech(request, text, settings)
+      : createDoubaoSpeech(request, text, settings);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown TTS error";
     return NextResponse.json({ error: message }, { status: 500 });

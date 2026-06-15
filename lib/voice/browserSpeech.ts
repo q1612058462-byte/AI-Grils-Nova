@@ -99,12 +99,16 @@ export type BrowserVoiceOption = {
 
 export type BrowserVoiceSettings = {
   engine: "cloud" | "browser";
+  cloudProvider: "openai" | "doubao";
   voiceURI: string;
   cloudBaseUrl: string;
   cloudApiKey: string;
   cloudModel: string;
   cloudVoice: string;
   cloudInstructions: string;
+  doubaoAppId: string;
+  doubaoAccessToken: string;
+  doubaoResourceId: string;
   rate: number;
   pitch: number;
 };

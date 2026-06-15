@@ -57,11 +57,15 @@ export function speakWithCloud(
         body: JSON.stringify({
           text,
           settings: {
+            provider: settings.cloudProvider,
             baseUrl: settings.cloudBaseUrl,
             apiKey: settings.cloudApiKey,
             model: settings.cloudModel,
             voice: settings.cloudVoice,
             instructions: settings.cloudInstructions,
+            appId: settings.doubaoAppId,
+            accessToken: settings.doubaoAccessToken,
+            resourceId: settings.doubaoResourceId,
             speed: settings.rate,
           },
         }),

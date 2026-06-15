@@ -434,6 +434,27 @@ function VoiceSettingsPanel({
       {settings.engine === "cloud" ? (
         <div className="mt-3 space-y-3">
           <label className="block">
+            <span className="mb-1 block text-slate-400">{t("Cloud provider", "云端供应商")}</span>
+            <select
+              value={settings.cloudProvider}
+              onChange={(event) => {
+                const provider = event.target.value === "openai" ? "openai" : "doubao";
+                onChange({
+                  ...settings,
+                  cloudProvider: provider,
+                  cloudBaseUrl: "",
+                  cloudApiKey: "",
+                  cloudModel: provider === "doubao" ? "seed-tts-2.0" : "gpt-4o-mini-tts",
+                  cloudVoice: provider === "doubao" ? "zh_female_vv_uranus_bigtts" : "marin",
+                });
+              }}
+              className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-slate-100 outline-none"
+            >
+              <option value="doubao">{t("Doubao Speech Synthesis 2.0", "豆包语音合成模型 2.0")}</option>
+              <option value="openai">{t("OpenAI-compatible speech", "OpenAI 兼容语音")}</option>
+            </select>
+          </label>
+          <label className="block">
             <span className="mb-1 block text-slate-400">TTS Base URL</span>
             <input
               value={settings.cloudBaseUrl}
@@ -443,16 +464,77 @@ function VoiceSettingsPanel({
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-slate-400">TTS API Key</span>
+            <span className="mb-1 block text-slate-400">
+              {settings.cloudProvider === "doubao" ? "Doubao API Key" : "TTS API Key"}
+            </span>
             <input
               type="password"
               value={settings.cloudApiKey}
               onChange={(event) => onChange({ ...settings, cloudApiKey: event.target.value })}
-              placeholder={t("Leave blank to use TTS_API_KEY", "留空使用 TTS_API_KEY")}
+              placeholder={
+                settings.cloudProvider === "doubao"
+                  ? t("Leave blank to use DOUBAO_TTS_API_KEY", "留空使用 DOUBAO_TTS_API_KEY")
+                  : t("Leave blank to use TTS_API_KEY", "留空使用 TTS_API_KEY")
+              }
               autoComplete="off"
               className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-slate-100 outline-none placeholder:text-slate-600"
             />
           </label>
+          {settings.cloudProvider === "doubao" ? (
+            <>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+                <div className="mb-2 text-slate-400">
+                  {t(
+                    "Legacy console credentials (only needed when API Key is unavailable)",
+                    "旧控制台凭证（无法使用 API Key 时填写）"
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    value={settings.doubaoAppId}
+                    onChange={(event) => onChange({ ...settings, doubaoAppId: event.target.value })}
+                    placeholder="App ID"
+                    className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-slate-100 outline-none"
+                  />
+                  <input
+                    type="password"
+                    value={settings.doubaoAccessToken}
+                    onChange={(event) => onChange({
+                      ...settings,
+                      doubaoAccessToken: event.target.value,
+                    })}
+                    placeholder="Access Token"
+                    autoComplete="off"
+                    className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-slate-100 outline-none"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block">
+                  <span className="mb-1 block text-slate-400">Resource ID</span>
+                  <input
+                    value={settings.doubaoResourceId}
+                    onChange={(event) => onChange({
+                      ...settings,
+                      doubaoResourceId: event.target.value,
+                    })}
+                    placeholder="seed-tts-2.0"
+                    className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-slate-100 outline-none"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-slate-400">Speaker ID</span>
+                  <input
+                    value={settings.cloudVoice}
+                    onChange={(event) => onChange({ ...settings, cloudVoice: event.target.value })}
+                    placeholder="zh_female_vv_uranus_bigtts"
+                    className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-slate-100 outline-none"
+                  />
+                </label>
+              </div>
+            </>
+          ) : (
+            <>
           <div className="grid grid-cols-2 gap-2">
             <label className="block">
               <span className="mb-1 block text-slate-400">{t("Model", "模型")}</span>
@@ -488,6 +570,8 @@ function VoiceSettingsPanel({
               className="w-full resize-none rounded-lg border border-white/10 bg-slate-900 px-2 py-2 leading-4 text-slate-100 outline-none"
             />
           </label>
+            </>
+          )}
         </div>
       ) : (
         <label className="mt-3 block">
@@ -541,10 +625,15 @@ function VoiceSettingsPanel({
       ) : null}
       <p className="mt-2 leading-4 text-slate-500">
         {settings.engine === "cloud"
-          ? t(
-              "Cloud audio is AI-generated sentence by sentence. If it is unavailable, Nora falls back to the system voice.",
-              "云端音频是按句生成的 AI 合成语音。服务不可用时，Nora 会自动回退到系统语音。"
-            )
+          ? settings.cloudProvider === "doubao"
+            ? t(
+                "Doubao 2.0 audio is generated sentence by sentence. Use the Speaker ID enabled for your Volcengine account.",
+                "豆包 2.0 按句生成语音，请填写火山引擎账号已开通的 Speaker ID。"
+              )
+            : t(
+                "Cloud audio is AI-generated sentence by sentence. If it is unavailable, Nora falls back to the system voice.",
+                "云端音频是按句生成的 AI 合成语音。服务不可用时，Nora 会自动回退到系统语音。"
+              )
           : t(
               "Voices are provided by your operating system and browser. Edge often provides more online voices.",
               "音色来自操作系统和浏览器。Edge 通常会提供更多在线中文音色。"
