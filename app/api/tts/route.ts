@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import { getSpeakableText } from "@/lib/avatar/expressionMapper";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,8 @@ type DoubaoChunk = {
   message?: string;
   data?: string;
 };
+
+const DOUBAO_SUCCESS_CODES = new Set([0, 20000000]);
 
 function getString(value: unknown, fallback: string, maxLength = 4096) {
   return typeof value === "string" && value.trim()
@@ -236,7 +239,10 @@ async function createDoubaoSpeech(
   const audioParts: Buffer[] = [];
 
   for (const chunk of chunks) {
-    if (typeof chunk.code === "number" && chunk.code !== 0) {
+    if (
+      typeof chunk.code === "number" &&
+      !DOUBAO_SUCCESS_CODES.has(chunk.code)
+    ) {
       return NextResponse.json(
         {
           error: `Doubao TTS returned code ${chunk.code}.`,
@@ -337,7 +343,7 @@ export async function POST(request: Request) {
       text?: unknown;
       settings?: TtsSettings;
     };
-    const text = getString(body.text, "", 4096);
+    const text = getSpeakableText(getString(body.text, "", 4096));
     if (!text) {
       return NextResponse.json({ error: "Speech text is required." }, { status: 400 });
     }
