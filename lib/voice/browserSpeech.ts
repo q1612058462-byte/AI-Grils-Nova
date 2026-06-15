@@ -98,7 +98,13 @@ export type BrowserVoiceOption = {
 };
 
 export type BrowserVoiceSettings = {
+  engine: "cloud" | "browser";
   voiceURI: string;
+  cloudBaseUrl: string;
+  cloudApiKey: string;
+  cloudModel: string;
+  cloudVoice: string;
+  cloudInstructions: string;
   rate: number;
   pitch: number;
 };

@@ -360,7 +360,11 @@ export default function SceneDialogueOverlay({
               isUser ? "text-amber-200/90" : "text-cyan-200/80"
             }`}
           >
-            {isUser ? "You" : "Nora"}
+            {isUser
+              ? "You"
+              : voiceOutputEnabled
+                ? `Nora · ${t("AI voice", "AI 合成语音")}`
+                : "Nora"}
           </div>
           <p className="whitespace-pre-wrap text-left text-sm font-medium leading-7 sm:text-base">
             {sentences[sentenceIndex]}
@@ -411,22 +415,98 @@ function VoiceSettingsPanel({
   const { language } = useUiLanguage();
   const t = (en: string, zh: string) => uiText(language, en, zh);
   return (
-    <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/90 p-3 text-left text-[11px] text-slate-300 shadow-xl backdrop-blur">
+    <div className="mt-3 max-h-[min(70vh,560px)] overflow-y-auto rounded-xl border border-white/10 bg-slate-950/90 p-3 text-left text-[11px] text-slate-300 shadow-xl backdrop-blur [scrollbar-color:rgba(148,163,184,0.4)_transparent] [scrollbar-width:thin]">
       <label className="block">
-        <span className="mb-1 block text-slate-400">{t("System voice", "系统音色")}</span>
+        <span className="mb-1 block text-slate-400">{t("Voice engine", "语音引擎")}</span>
         <select
-          value={settings.voiceURI}
-          onChange={(event) => onChange({ ...settings, voiceURI: event.target.value })}
+          value={settings.engine}
+          onChange={(event) => onChange({
+            ...settings,
+            engine: event.target.value === "browser" ? "browser" : "cloud",
+          })}
           className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-slate-100 outline-none"
         >
-          <option value="">{t("Automatic voice", "自动选择中文音色")}</option>
-          {voices.map((voice) => (
-            <option key={voice.voiceURI} value={voice.voiceURI}>
-              {voice.name} ({voice.lang}){voice.localService ? "" : ` · ${t("Online", "在线")}`}
-            </option>
-          ))}
+          <option value="cloud">{t("Natural cloud voice", "自然云端语音")}</option>
+          <option value="browser">{t("System browser voice", "系统浏览器语音")}</option>
         </select>
       </label>
+
+      {settings.engine === "cloud" ? (
+        <div className="mt-3 space-y-3">
+          <label className="block">
+            <span className="mb-1 block text-slate-400">TTS Base URL</span>
+            <input
+              value={settings.cloudBaseUrl}
+              onChange={(event) => onChange({ ...settings, cloudBaseUrl: event.target.value })}
+              placeholder={t("Leave blank to use the server setting", "留空使用服务端设置")}
+              className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-slate-100 outline-none placeholder:text-slate-600"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-slate-400">TTS API Key</span>
+            <input
+              type="password"
+              value={settings.cloudApiKey}
+              onChange={(event) => onChange({ ...settings, cloudApiKey: event.target.value })}
+              placeholder={t("Leave blank to use TTS_API_KEY", "留空使用 TTS_API_KEY")}
+              autoComplete="off"
+              className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-slate-100 outline-none placeholder:text-slate-600"
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="mb-1 block text-slate-400">{t("Model", "模型")}</span>
+              <input
+                value={settings.cloudModel}
+                onChange={(event) => onChange({ ...settings, cloudModel: event.target.value })}
+                placeholder="gpt-4o-mini-tts"
+                className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-slate-100 outline-none"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-slate-400">{t("Voice", "音色")}</span>
+              <input
+                value={settings.cloudVoice}
+                onChange={(event) => onChange({ ...settings, cloudVoice: event.target.value })}
+                list="cloud-tts-voices"
+                placeholder="marin"
+                className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-slate-100 outline-none"
+              />
+              <datalist id="cloud-tts-voices">
+                {["marin", "cedar", "coral", "sage", "alloy", "ash", "ballad", "echo", "fable", "nova", "onyx", "shimmer", "verse"].map((voice) => (
+                  <option key={voice} value={voice} />
+                ))}
+              </datalist>
+            </label>
+          </div>
+          <label className="block">
+            <span className="mb-1 block text-slate-400">{t("Speaking style", "说话风格")}</span>
+            <textarea
+              value={settings.cloudInstructions}
+              onChange={(event) => onChange({ ...settings, cloudInstructions: event.target.value })}
+              rows={3}
+              className="w-full resize-none rounded-lg border border-white/10 bg-slate-900 px-2 py-2 leading-4 text-slate-100 outline-none"
+            />
+          </label>
+        </div>
+      ) : (
+        <label className="mt-3 block">
+          <span className="mb-1 block text-slate-400">{t("System voice", "系统音色")}</span>
+          <select
+            value={settings.voiceURI}
+            onChange={(event) => onChange({ ...settings, voiceURI: event.target.value })}
+            className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-slate-100 outline-none"
+          >
+            <option value="">{t("Automatic voice", "自动选择中文音色")}</option>
+            {voices.map((voice) => (
+              <option key={voice.voiceURI} value={voice.voiceURI}>
+                {voice.name} ({voice.lang}){voice.localService ? "" : ` · ${t("Online", "在线")}`}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
       <label className="mt-3 block">
         <span className="flex justify-between text-slate-400">
           <span>{t("Rate", "语速")}</span>
@@ -442,26 +522,33 @@ function VoiceSettingsPanel({
           className="mt-1 w-full accent-cyan-400"
         />
       </label>
-      <label className="mt-3 block">
-        <span className="flex justify-between text-slate-400">
-          <span>{t("Pitch", "音高")}</span>
-          <span>{settings.pitch.toFixed(2)}</span>
-        </span>
-        <input
-          type="range"
-          min="0.5"
-          max="1.6"
-          step="0.05"
-          value={settings.pitch}
-          onChange={(event) => onChange({ ...settings, pitch: Number(event.target.value) })}
-          className="mt-1 w-full accent-cyan-400"
-        />
-      </label>
+      {settings.engine === "browser" ? (
+        <label className="mt-3 block">
+          <span className="flex justify-between text-slate-400">
+            <span>{t("Pitch", "音高")}</span>
+            <span>{settings.pitch.toFixed(2)}</span>
+          </span>
+          <input
+            type="range"
+            min="0.5"
+            max="1.6"
+            step="0.05"
+            value={settings.pitch}
+            onChange={(event) => onChange({ ...settings, pitch: Number(event.target.value) })}
+            className="mt-1 w-full accent-cyan-400"
+          />
+        </label>
+      ) : null}
       <p className="mt-2 leading-4 text-slate-500">
-        {t(
-          "Voices are provided by your operating system and browser. Edge often provides more online voices.",
-          "音色来自操作系统和浏览器。Edge 通常会提供更多在线中文音色。"
-        )}
+        {settings.engine === "cloud"
+          ? t(
+              "Cloud audio is AI-generated sentence by sentence. If it is unavailable, Nora falls back to the system voice.",
+              "云端音频是按句生成的 AI 合成语音。服务不可用时，Nora 会自动回退到系统语音。"
+            )
+          : t(
+              "Voices are provided by your operating system and browser. Edge often provides more online voices.",
+              "音色来自操作系统和浏览器。Edge 通常会提供更多在线中文音色。"
+            )}
       </p>
       <button
         type="button"

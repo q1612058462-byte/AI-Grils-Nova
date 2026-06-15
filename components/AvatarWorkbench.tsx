@@ -29,6 +29,7 @@ import {
   type BrowserVoiceOption,
   type BrowserVoiceSettings,
 } from "@/lib/voice/browserSpeech";
+import { speakWithCloud } from "@/lib/voice/cloudSpeech";
 import type {
   AvatarConversation,
   AvatarExpression,
@@ -43,7 +44,14 @@ const APPEARANCE_STORAGE_KEY = "avatar.appearance.v1";
 const MODEL_API_SETTINGS_STORAGE_KEY = "avatar.modelApiSettings.v1";
 const UI_LANGUAGE_STORAGE_KEY = "avatar.uiLanguage.v1";
 const DEFAULT_VOICE_SETTINGS: BrowserVoiceSettings = {
+  engine: "cloud",
   voiceURI: "",
+  cloudBaseUrl: "",
+  cloudApiKey: "",
+  cloudModel: "gpt-4o-mini-tts",
+  cloudVoice: "marin",
+  cloudInstructions:
+    "Speak naturally in a warm, gentle, conversational tone. Use expressive but restrained intonation and clear pauses.",
   rate: 0.95,
   pitch: 1.05,
 };
@@ -104,6 +112,7 @@ export default function AvatarWorkbench() {
   const modelAbortRef = useRef<AbortController | null>(null);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const speechCancelRef = useRef<(() => void) | null>(null);
+  const cloudTtsUnavailableRef = useRef(false);
 
   const nextId = useMemo(() => {
     let counter = 0;
@@ -223,7 +232,27 @@ export default function AvatarWorkbench() {
       try {
         const parsed = JSON.parse(storedVoiceSettings) as Partial<BrowserVoiceSettings>;
         setVoiceSettings({
+          engine:
+            parsed.engine === "browser" || parsed.engine === "cloud"
+              ? parsed.engine
+              : DEFAULT_VOICE_SETTINGS.engine,
           voiceURI: typeof parsed.voiceURI === "string" ? parsed.voiceURI : "",
+          cloudBaseUrl:
+            typeof parsed.cloudBaseUrl === "string" ? parsed.cloudBaseUrl : "",
+          cloudApiKey:
+            typeof parsed.cloudApiKey === "string" ? parsed.cloudApiKey : "",
+          cloudModel:
+            typeof parsed.cloudModel === "string" && parsed.cloudModel.trim()
+              ? parsed.cloudModel
+              : DEFAULT_VOICE_SETTINGS.cloudModel,
+          cloudVoice:
+            typeof parsed.cloudVoice === "string" && parsed.cloudVoice.trim()
+              ? parsed.cloudVoice
+              : DEFAULT_VOICE_SETTINGS.cloudVoice,
+          cloudInstructions:
+            typeof parsed.cloudInstructions === "string"
+              ? parsed.cloudInstructions
+              : DEFAULT_VOICE_SETTINGS.cloudInstructions,
           rate: typeof parsed.rate === "number" ? parsed.rate : DEFAULT_VOICE_SETTINGS.rate,
           pitch: typeof parsed.pitch === "number" ? parsed.pitch : DEFAULT_VOICE_SETTINGS.pitch,
         });
@@ -386,10 +415,17 @@ export default function AvatarWorkbench() {
 
   const updateVoiceSettings = useCallback((settings: BrowserVoiceSettings) => {
     const normalized = {
+      engine: settings.engine,
       voiceURI: settings.voiceURI,
+      cloudBaseUrl: settings.cloudBaseUrl.trim(),
+      cloudApiKey: settings.cloudApiKey.trim(),
+      cloudModel: settings.cloudModel.trim() || DEFAULT_VOICE_SETTINGS.cloudModel,
+      cloudVoice: settings.cloudVoice.trim() || DEFAULT_VOICE_SETTINGS.cloudVoice,
+      cloudInstructions: settings.cloudInstructions.trim(),
       rate: Math.min(1.6, Math.max(0.5, settings.rate)),
       pitch: Math.min(1.6, Math.max(0.5, settings.pitch)),
     };
+    cloudTtsUnavailableRef.current = false;
     setVoiceSettings(normalized);
     window.localStorage.setItem(VOICE_SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
   }, []);
@@ -402,7 +438,7 @@ export default function AvatarWorkbench() {
       return;
     }
 
-    const playback = speakWithBrowser(speakableText, voiceSettings, {
+    const playbackHandlers = {
       onStart: () => {
         setState("speaking");
         lipSyncStopRef.current?.();
@@ -413,7 +449,28 @@ export default function AvatarWorkbench() {
         stopLipSync();
         setState("idle");
       },
-    });
+    };
+
+    if (voiceSettings.engine === "cloud" && !cloudTtsUnavailableRef.current) {
+      const cloudPlayback = speakWithCloud(speakableText, voiceSettings, playbackHandlers);
+      speechCancelRef.current = cloudPlayback.cancel;
+
+      try {
+        await cloudPlayback.promise;
+        speechCancelRef.current = null;
+        return;
+      } catch (cloudError) {
+        if (cloudPlayback.wasCancelled()) return;
+        cloudTtsUnavailableRef.current = true;
+        setError(
+          cloudError instanceof Error
+            ? `Cloud voice unavailable; using the system voice. ${cloudError.message}`
+            : "Cloud voice unavailable; using the system voice."
+        );
+      }
+    }
+
+    const playback = speakWithBrowser(speakableText, voiceSettings, playbackHandlers);
 
     if (!playback) {
       setError("当前浏览器不支持语音朗读，文字回复仍可正常使用。");

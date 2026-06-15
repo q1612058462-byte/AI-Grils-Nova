@@ -138,15 +138,32 @@ visit.
 
 Select the **Voice Sliders** button from either the input panel or active-dialogue toolbar.
 
-- **System Voice** selects from voices supplied by the operating system and browser.
-- **Automatic Voice** lets the application choose a suitable available voice.
+- **Voice Engine** switches between natural cloud speech and the browser's system speech.
+- **Natural Cloud Voice** sends each displayed sentence through an OpenAI-compatible
+  `/audio/speech` endpoint and plays the generated audio.
+- **System Browser Voice** uses voices supplied by the operating system and browser as a free,
+  offline-friendly fallback.
+- **Model** selects the cloud TTS model. The default is `gpt-4o-mini-tts`.
+- **Voice** selects a cloud voice such as `marin`, `cedar`, `coral`, or another voice supported by
+  the configured provider.
+- **Speaking Style** describes the intended tone, pacing, emotion, and delivery for models that
+  support voice instructions.
+- **System Voice** selects from installed operating-system voices when the browser engine is active.
+- **Automatic Voice** lets the application choose a suitable installed voice.
 - **Rate** controls speaking speed from `0.5x` to `1.6x`.
-- **Pitch** controls voice pitch from `0.5` to `1.6`.
+- **Pitch** controls system-browser voice pitch from `0.5` to `1.6`. Cloud models control vocal
+  character through their selected voice and speaking-style instructions instead.
 - **Preview** speaks a short sample using the current settings.
 
-Voice settings and the speaker on/off state are stored locally in the browser. Microsoft Edge
-often exposes more online voices than other browsers. Speech recognition and microphone access
-work most reliably on `localhost` or an HTTPS deployment.
+Cloud speech is requested one displayed sentence at a time, so manual and automatic subtitle
+playback remain synchronized with the audio. If cloud generation fails or is not configured, Nora
+reports the problem once and falls back to the system voice for the rest of the page session.
+Active dialogue is labeled as AI voice output so users know the audio is synthetic.
+
+Voice settings and the speaker on/off state are stored locally in the browser. A cloud API key
+entered in the page is also stored in browser `localStorage`; use server-side environment variables
+on shared devices. Microsoft Edge often exposes more system voices than other browsers. Speech
+recognition and microphone access work most reliably on `localhost` or an HTTPS deployment.
 
 ### Expressions And Non-Spoken Cues
 
@@ -657,9 +674,26 @@ Then restart the server and verify:
 
 ## Voice Support
 
-- Speech recognition uses the browser Web Speech API.
-- Speech output uses `speechSynthesis`.
-- Available voices depend on the operating system and browser.
+Natural cloud TTS is configured independently from the chat model:
+
+```env
+TTS_API_KEY=your-tts-provider-key
+TTS_BASE_URL=https://api.openai.com/v1
+TTS_MODEL=gpt-4o-mini-tts
+TTS_VOICE=marin
+TTS_INSTRUCTIONS=Speak naturally in a warm, gentle, conversational tone.
+```
+
+The server appends `/audio/speech` unless the configured URL already ends with that path. The
+in-page Voice Settings panel can override the Base URL, API key, model, voice, speed, and speaking
+style for the current browser.
+
+- Cloud TTS audio is generated and played sentence by sentence.
+- `TTS_API_KEY` falls back to `OPENAI_API_KEY` when omitted.
+- Older `tts-1` models automatically omit unsupported speaking-style instructions.
+- Browser `speechSynthesis` remains available as a fallback.
+- Speech recognition continues to use the browser Web Speech API.
+- Available browser voices depend on the operating system and browser.
 - Microsoft Edge commonly provides additional online Chinese voices.
 
 Microphone access generally requires HTTPS outside localhost.
