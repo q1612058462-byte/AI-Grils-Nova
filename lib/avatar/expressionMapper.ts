@@ -141,7 +141,20 @@ export function parseAvatarResponse(
 
 export function getSpeakableText(text: string) {
   return parseAvatarResponse(text).text
-    .replace(/^[.…]+$|^\s*$/, "")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^\]]+)\]\((?:[^()]|\([^)]*\))*\)/g, "$1")
+    .replace(/<https?:\/\/[^>]+>/gi, " ")
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/^\s*(?:[-*+]|\d+[.)]|[（(]?\d+[）)])\s+/gm, "")
+    .replace(/^\s*>\s?/gm, "")
+    .replace(/[`*_~#|\\{}[\]]+/g, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\s*\n+\s*/g, "，")
+    .replace(/，{2,}/g, "，")
+    .replace(/^[.…，、:：;；+\-=]+$|^\s*$/, "")
     .trim();
 }
 

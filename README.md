@@ -46,8 +46,9 @@ Nora is designed around several principles:
   remains available for accessibility and review.
 - **Emotion should be expressed, not narrated.** Supported emoji and expression directions are
   removed from spoken output and translated into avatar expressions.
-- **Context should remain visible.** The latest Nora sentence stays in the scene while the user
-  prepares a reply, and the complete conversation is available in a persistent side drawer.
+- **Context should remain visible.** Nora's five most recent dialogue units stay in the scene while
+  the user prepares a reply, and the complete conversation is available in a persistent side
+  drawer.
 - **The experience should be adaptable.** Users can change scenes, avatars, language, model
   provider, voice, playback style, and conversation without leaving the main stage.
 
@@ -169,8 +170,10 @@ model.
 
 ### Previous Line And Conversation History
 
-The upper-left scene card shows Nora's most recent completed sentence while the user writes the
-next message. It provides immediate context without reopening the full transcript.
+The upper-left scene card shows Nora's five most recent completed dialogue units while the user
+writes the next message. Preserved line breaks and list structure keep steps and enumerations
+readable without reopening the full transcript. The card becomes scrollable when the cached
+content exceeds its maximum height.
 
 Select **History** to open the right-side drawer:
 

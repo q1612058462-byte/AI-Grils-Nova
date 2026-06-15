@@ -257,13 +257,13 @@ export default function AvatarWorkbench() {
     () => activeSession.messages.find((entry) => entry.id === activeSession.dialogueQueue[0]),
     [activeSession]
   );
-  const previousNoraDialogue = useMemo(
-    () => [...activeSession.messages].reverse().find(
+  const recentNoraDialogues = useMemo(
+    () => activeSession.messages.filter(
       (entry) =>
         entry.speaker === "nora" &&
         entry.id !== activeSession.dialogueQueue[0] &&
         entry.text.trim()
-    ),
+    ).slice(-5),
     [activeSession]
   );
 
@@ -590,7 +590,7 @@ export default function AvatarWorkbench() {
         mouthOpen={mouthOpen}
         expression={expression}
         dialogue={activeDialogue}
-        previousDialogue={previousNoraDialogue}
+        recentDialogues={recentNoraDialogues}
         onDismissDialogue={dismissActiveDialogue}
         modelInput={activeSession.draft}
         modelInputDisabled={inputDisabled}

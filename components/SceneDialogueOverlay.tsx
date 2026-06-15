@@ -14,7 +14,7 @@ type DisplayStyle = "bubble" | "subtitle";
 
 type SceneDialogueOverlayProps = {
   dialogue?: SceneDialogueEntry;
-  previousDialogue?: SceneDialogueEntry;
+  recentDialogues: SceneDialogueEntry[];
   onDismiss: () => void;
   input: string;
   inputDisabled: boolean;
@@ -38,7 +38,7 @@ const STYLE_STORAGE_KEY = "avatar.dialogueDisplayStyle.v1";
 
 export default function SceneDialogueOverlay({
   dialogue,
-  previousDialogue,
+  recentDialogues,
   onDismiss,
   input,
   inputDisabled,
@@ -67,10 +67,12 @@ export default function SceneDialogueOverlay({
     [dialogue?.text]
   );
   const isUser = dialogue?.speaker === "user";
-  const previousSentence = useMemo(() => {
-    const previousSentences = splitDialogueSentences(previousDialogue?.text ?? "");
-    return previousSentences.at(-1) ?? "";
-  }, [previousDialogue?.text]);
+  const recentSentences = useMemo(
+    () => recentDialogues
+      .flatMap((entry) => splitDialogueSentences(entry.text))
+      .slice(-5),
+    [recentDialogues]
+  );
 
   useEffect(() => {
     const storedMode = window.localStorage.getItem(MODE_STORAGE_KEY);
@@ -164,14 +166,21 @@ export default function SceneDialogueOverlay({
     window.localStorage.setItem(STYLE_STORAGE_KEY, style);
   };
 
-  const previousDialoguePanel = previousSentence ? (
-    <div className="absolute left-4 top-4 max-w-[min(360px,42%)] rounded-xl border border-white/10 bg-slate-950/65 px-3 py-2 text-left shadow-lg backdrop-blur-md">
+  const previousDialoguePanel = recentSentences.length > 0 ? (
+    <div className="pointer-events-auto absolute left-4 top-4 max-h-[min(38vh,320px)] w-[min(390px,44%)] overflow-y-auto rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-left shadow-lg backdrop-blur-md [scrollbar-color:rgba(148,163,184,0.35)_transparent] [scrollbar-width:thin]">
       <div className="mb-1 text-[9px] uppercase tracking-[0.2em] text-slate-500">
-        Nora · {t("Previous", "上一句")}
+        Nora · {t("Recent context", "最近 5 句")}
       </div>
-      <p className="line-clamp-3 text-[11px] leading-5 text-slate-300">
-        {previousSentence}
-      </p>
+      <div className="space-y-1.5">
+        {recentSentences.map((sentence, index) => (
+          <p
+            key={`${index}-${sentence}`}
+            className="whitespace-pre-wrap border-l border-white/10 pl-2 text-[11px] leading-5 text-slate-300"
+          >
+            {sentence}
+          </p>
+        ))}
+      </div>
     </div>
   ) : null;
 
@@ -353,7 +362,7 @@ export default function SceneDialogueOverlay({
           >
             {isUser ? "You" : "Nora"}
           </div>
-          <p className="text-sm font-medium leading-7 sm:text-base">
+          <p className="whitespace-pre-wrap text-left text-sm font-medium leading-7 sm:text-base">
             {sentences[sentenceIndex]}
           </p>
 

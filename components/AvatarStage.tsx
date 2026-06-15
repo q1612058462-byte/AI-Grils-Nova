@@ -22,7 +22,7 @@ type AvatarStageProps = {
   mouthOpen: number;
   expression: AvatarExpression;
   dialogue?: SceneDialogueEntry;
-  previousDialogue?: SceneDialogueEntry;
+  recentDialogues: SceneDialogueEntry[];
   onDismissDialogue: () => void;
   modelInput: string;
   modelInputDisabled: boolean;
@@ -59,7 +59,7 @@ export default function AvatarStage({
   mouthOpen,
   expression,
   dialogue,
-  previousDialogue,
+  recentDialogues,
   onDismissDialogue,
   modelInput,
   modelInputDisabled,
@@ -132,7 +132,7 @@ export default function AvatarStage({
         />
         <SceneDialogueOverlay
           dialogue={dialogue}
-          previousDialogue={previousDialogue}
+          recentDialogues={recentDialogues}
           onDismiss={onDismissDialogue}
           input={modelInput}
           inputDisabled={modelInputDisabled}
