@@ -7,9 +7,10 @@ export type ReferencePreset = {
   nameZh: string;
   nameEn: string;
   descriptionZh: string;
-  source: "VRMA Ref." | "Mixamo Ref." | "VRM Preset" | "Custom";
+  source: "VRMA Clip" | "VRMA Ref." | "Mixamo Ref." | "VRM Preset" | "Custom";
   expression: AvatarExpression;
   pose: PosePatch;
+  vrmaUrl?: string;
 };
 
 export type PosePatch = Partial<Record<PoseDebugBoneName, Partial<DeskPose[PoseDebugBoneName]>>>;
@@ -24,6 +25,25 @@ function createPreset(
   pose: PosePatch
 ): ReferencePreset {
   return { id, nameZh, nameEn, descriptionZh, source, expression, pose };
+}
+
+function createVrmaPreset(
+  id: string,
+  name: string,
+  descriptionZh: string,
+  expression: AvatarExpression,
+  vrmaUrl: string
+): ReferencePreset {
+  return {
+    id,
+    nameZh: name,
+    nameEn: name,
+    descriptionZh,
+    source: "VRMA Clip",
+    expression,
+    pose: {},
+    vrmaUrl,
+  };
 }
 
 export function applyReferencePreset(basePose: DeskPose, preset: ReferencePreset): DeskPose {
@@ -163,14 +183,98 @@ export const REFERENCE_PRESETS: ReferencePreset[] = [
   ),
 ];
 
+export const VRMA_REFERENCE_PRESETS: ReferencePreset[] = [
+  createVrmaPreset(
+    "vrma-angry",
+    "Angry",
+    "来自 tk256ailab/vrm-viewer 的 VRMA 动作，点击后播放一次。",
+    "serious",
+    "/animations/angry.vrma"
+  ),
+  createVrmaPreset(
+    "vrma-blush",
+    "Blush",
+    "来自 tk256ailab/vrm-viewer 的 VRMA 动作，点击后播放一次。",
+    "smile",
+    "/animations/blush.vrma"
+  ),
+  createVrmaPreset(
+    "vrma-clapping",
+    "Clapping",
+    "来自 tk256ailab/vrm-viewer 的 VRMA 动作，点击后播放一次。",
+    "happy",
+    "/animations/clapping.vrma"
+  ),
+  createVrmaPreset(
+    "vrma-goodbye",
+    "Goodbye",
+    "来自 tk256ailab/vrm-viewer 的 VRMA 动作，点击后播放一次。",
+    "smile",
+    "/animations/goodbye.vrma"
+  ),
+  createVrmaPreset(
+    "vrma-jump",
+    "Jump",
+    "来自 tk256ailab/vrm-viewer 的 VRMA 动作，点击后播放一次。",
+    "happy",
+    "/animations/jump.vrma"
+  ),
+  createVrmaPreset(
+    "vrma-look-around",
+    "LookAround",
+    "来自 tk256ailab/vrm-viewer 的 VRMA 动作，点击后播放一次。",
+    "neutral",
+    "/animations/look-around.vrma"
+  ),
+  createVrmaPreset(
+    "vrma-relax",
+    "Relax",
+    "来自 tk256ailab/vrm-viewer 的 VRMA 动作，点击后播放一次。",
+    "smile",
+    "/animations/relax.vrma"
+  ),
+  createVrmaPreset(
+    "vrma-sad",
+    "Sad",
+    "来自 tk256ailab/vrm-viewer 的 VRMA 动作，点击后播放一次。",
+    "comfort",
+    "/animations/sad.vrma"
+  ),
+  createVrmaPreset(
+    "vrma-sleepy",
+    "Sleepy",
+    "来自 tk256ailab/vrm-viewer 的 VRMA 动作，点击后播放一次。",
+    "neutral",
+    "/animations/sleepy.vrma"
+  ),
+  createVrmaPreset(
+    "vrma-surprised",
+    "Surprised",
+    "来自 tk256ailab/vrm-viewer 的 VRMA 动作，点击后播放一次。",
+    "surprised",
+    "/animations/surprised.vrma"
+  ),
+  createVrmaPreset(
+    "vrma-thinking",
+    "Thinking",
+    "来自 tk256ailab/vrm-viewer 的 VRMA 动作，点击后播放一次。",
+    "serious",
+    "/animations/thinking.vrma"
+  ),
+];
+
 export const REFERENCE_SOURCES = [
   {
     name: "VRM Animation / VRMA",
     url: "https://vrm.dev/en/vrma/",
   },
   {
-    name: "VRoid Hub Free VRMA",
-    url: "https://vroid.com/en/news/6HozzBIV0KkcKf9dc1fZGW",
+    name: "tk256ailab/vrm-viewer MIT VRMA samples",
+    url: "https://github.com/tk256ailab/vrm-viewer",
+  },
+  {
+    name: "VRoid Project Free VRMA",
+    url: "https://vroid.booth.pm/items/5512385",
   },
   {
     name: "Adobe Mixamo",

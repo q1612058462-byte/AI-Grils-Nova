@@ -110,7 +110,7 @@ export default function ReferenceLibraryPanel({
 
       <div className="mt-5 border-t border-white/10 pt-4">
         <div className="mb-3 rounded-lg border border-amber-300/15 bg-amber-300/5 px-2.5 py-2 text-[10px] leading-4 text-slate-400">
-          Ref. 表示根据对应动作来源手工重定向的静态姿势，不会加载或播放外部 VRMA / Mixamo 动画。
+          VRMA Clip 会加载真实 .vrma 动作并播放一次；Ref. 是手工重定向的静态姿势，方便和真实动作效果对比。
         </div>
         <div className="mb-2 text-[10px] font-medium text-slate-400">在线参考来源 / Sources</div>
         <div className="space-y-1.5">

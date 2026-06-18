@@ -42,6 +42,7 @@ import {
 import {
   applyReferencePreset,
   REFERENCE_PRESETS,
+  VRMA_REFERENCE_PRESETS,
   type ReferencePreset,
 } from "@/lib/avatar/referenceLibrary";
 import type { AvatarExpression, AvatarState } from "@/types/avatar";
@@ -63,6 +64,7 @@ type AvatarFaceProps = {
 
 type VRMCharacterProps = AvatarFaceProps & {
   deskPose: DeskPose;
+  vrmaPlaybackRequest: VrmPlaybackRequest | null;
   showPoseDebug: boolean;
   previewReference: boolean;
   selectedBone: PoseDebugBoneName | null;
@@ -81,6 +83,12 @@ type BoneNodeEntry = {
 };
 
 type VrmAnimationActions = Partial<Record<AvatarState, THREE.AnimationAction>>;
+
+type VrmPlaybackRequest = {
+  id: number;
+  name: string;
+  url: string;
+};
 
 const CUSTOM_PRESETS_STORAGE_KEY = "avatar.customPosePresets.v1";
 const DEFAULT_CUSTOM_PRESET_NAME = "默认姿势3";
@@ -328,6 +336,18 @@ const movementProfile: Record<
 };
 
 const DEFAULT_PROCEDURAL_MOTION_INTENSITY = 0.45;
+const STATE_VRMA_INITIAL_DELAY: Record<AvatarState, number> = {
+  idle: 4.5,
+  listening: 2.5,
+  thinking: 1.4,
+  speaking: 1.8,
+};
+const STATE_VRMA_COOLDOWN: Record<AvatarState, [number, number]> = {
+  idle: [18, 30],
+  listening: [12, 22],
+  thinking: [10, 18],
+  speaking: [14, 24],
+};
 
 function getProceduralMotionIntensity() {
   const value = Number(process.env.NEXT_PUBLIC_AVATAR_MOTION_INTENSITY);
@@ -336,12 +356,62 @@ function getProceduralMotionIntensity() {
     : DEFAULT_PROCEDURAL_MOTION_INTENSITY;
 }
 
+function configureOneShotAction(action: THREE.AnimationAction) {
+  action.setLoop(THREE.LoopOnce, 1);
+  action.clampWhenFinished = false;
+  action.enabled = true;
+  action.setEffectiveTimeScale(1);
+  action.setEffectiveWeight(1);
+}
+
+function nextStateMotionDelay(state: AvatarState) {
+  const [min, max] = STATE_VRMA_COOLDOWN[state];
+  return min + Math.random() * (max - min);
+}
+
+function loadVrmaAction(
+  loader: GLTFLoader,
+  mixer: THREE.AnimationMixer,
+  vrm: VRM,
+  url: string,
+  name: string
+) {
+  return new Promise<THREE.AnimationAction | null>((resolve) => {
+    loader.load(
+      url,
+      (gltf) => {
+        const vrmAnimation = (
+          gltf.userData.vrmAnimations as VRMAnimation[] | undefined
+        )?.[0];
+        if (!vrmAnimation) {
+          console.warn(`No VRMA animation found in ${url}`);
+          resolve(null);
+          return;
+        }
+
+        const clip = createVRMAnimationClip(vrmAnimation, vrm);
+        clip.name = name;
+        const action = mixer.clipAction(clip);
+        configureOneShotAction(action);
+        action.setEffectiveWeight(0);
+        resolve(action);
+      },
+      undefined,
+      (error) => {
+        console.warn(`Failed to load VRMA animation: ${url}`, error);
+        resolve(null);
+      }
+    );
+  });
+}
+
 function VRMCharacter({
   state,
   expression,
   mouthOpen,
   speaking,
   deskPose,
+  vrmaPlaybackRequest,
   showPoseDebug,
   previewReference,
   selectedBone,
@@ -369,7 +439,10 @@ function VRMCharacter({
   });
   const animationMixerRef = useRef<THREE.AnimationMixer | null>(null);
   const animationActionsRef = useRef<VrmAnimationActions>({});
+  const vrmaActionCacheRef = useRef<Map<string, THREE.AnimationAction>>(new Map());
   const activeAnimationActionRef = useRef<THREE.AnimationAction | null>(null);
+  const activeAnimationSourceRef = useRef<"state" | "manual" | null>(null);
+  const nextStateMotionAtRef = useRef(0);
   const ikDraggingRef = useRef(false);
   const [characterRoot, setCharacterRoot] = useState<THREE.Group | null>(null);
   const [animationRevision, setAnimationRevision] = useState(0);
@@ -555,10 +628,12 @@ function VRMCharacter({
     animationMixerRef.current?.stopAllAction();
     animationMixerRef.current = null;
     animationActionsRef.current = {};
+    vrmaActionCacheRef.current = new Map();
     activeAnimationActionRef.current = null;
+    activeAnimationSourceRef.current = null;
     setAnimationRevision((current) => current + 1);
 
-    if (!vrm || configuredAnimations.length === 0) return;
+    if (!vrm) return;
 
     let cancelled = false;
     const mixer = new THREE.AnimationMixer(vrm.scene);
@@ -568,45 +643,18 @@ function VRMCharacter({
     loader.register((parser) => new VRMAnimationLoaderPlugin(parser));
 
     void Promise.allSettled(
-      configuredAnimations.map(
-        (preset) =>
-          new Promise<void>((resolve) => {
-            loader.load(
-              preset.url,
-              (gltf) => {
-                if (cancelled) {
-                  resolve();
-                  return;
-                }
-                const vrmAnimation = (
-                  gltf.userData.vrmAnimations as VRMAnimation[] | undefined
-                )?.[0];
-                if (!vrmAnimation) {
-                  console.warn(`No VRMA animation found in ${preset.url}`);
-                  resolve();
-                  return;
-                }
-
-                const clip = createVRMAnimationClip(vrmAnimation, vrm);
-                clip.name = preset.name;
-                const action = mixer.clipAction(clip);
-                action.loop = THREE.LoopRepeat;
-                action.clampWhenFinished = false;
-                action.enabled = true;
-                action.setEffectiveWeight(0);
-                animationActionsRef.current[preset.state] = action;
-                resolve();
-              },
-              undefined,
-              (error) => {
-                if (!cancelled) {
-                  console.warn(`Failed to load VRMA animation: ${preset.url}`, error);
-                }
-                resolve();
-              }
-            );
-          })
-      )
+      configuredAnimations.map(async (preset) => {
+        const action = await loadVrmaAction(
+          loader,
+          mixer,
+          vrm,
+          preset.url,
+          preset.name
+        );
+        if (action && !cancelled) {
+          animationActionsRef.current[preset.state] = action;
+        }
+      })
     ).then(() => {
       if (!cancelled) {
         setAnimationRevision((current) => current + 1);
@@ -618,37 +666,99 @@ function VRMCharacter({
       mixer.stopAllAction();
       animationMixerRef.current = null;
       animationActionsRef.current = {};
+      vrmaActionCacheRef.current = new Map();
       activeAnimationActionRef.current = null;
+      activeAnimationSourceRef.current = null;
     };
   }, [configuredAnimations, vrm]);
 
   useEffect(() => {
-    const actions = animationActionsRef.current;
-    const nextAction = actions[state] ?? null;
-    const previousAction = activeAnimationActionRef.current;
+    const mixer = animationMixerRef.current;
+    if (!mixer) return;
 
-    if (previousAction === nextAction) return;
+    const handleFinished = (event: { action: THREE.AnimationAction }) => {
+      if (event.action !== activeAnimationActionRef.current) return;
+      activeAnimationActionRef.current = null;
+      activeAnimationSourceRef.current = null;
+      nextStateMotionAtRef.current =
+        performance.now() / 1000 + nextStateMotionDelay(state);
+    };
 
-    if (nextAction) {
-      nextAction.reset();
-      nextAction.enabled = true;
-      nextAction.setEffectiveTimeScale(1);
-      nextAction.setEffectiveWeight(1);
-      nextAction.fadeIn(previousAction ? 0.35 : 0.15);
-      nextAction.play();
-    }
-
-    if (previousAction) {
-      previousAction.fadeOut(nextAction ? 0.35 : 0.15);
-    }
-
-    activeAnimationActionRef.current = nextAction;
+    mixer.addEventListener("finished", handleFinished);
+    return () => {
+      mixer.removeEventListener("finished", handleFinished);
+    };
   }, [animationRevision, state]);
+
+  const playOneShotAction = useCallback((
+    action: THREE.AnimationAction,
+    source: "state" | "manual",
+    fadeDuration = 0.2
+  ) => {
+    const previousAction = activeAnimationActionRef.current;
+    if (previousAction && previousAction !== action) {
+      previousAction.fadeOut(fadeDuration);
+    }
+
+    configureOneShotAction(action);
+    action.reset();
+    action.fadeIn(fadeDuration);
+    action.play();
+    activeAnimationActionRef.current = action;
+    activeAnimationSourceRef.current = source;
+  }, []);
+
+  useEffect(() => {
+    nextStateMotionAtRef.current =
+      performance.now() / 1000 + STATE_VRMA_INITIAL_DELAY[state];
+  }, [animationRevision, state]);
+
+  useEffect(() => {
+    if (!vrm || !vrmaPlaybackRequest) return;
+    const mixer = animationMixerRef.current;
+    if (!mixer) return;
+
+    let cancelled = false;
+    const loader = new GLTFLoader();
+    loader.register((parser) => new VRMAnimationLoaderPlugin(parser));
+
+    void (async () => {
+      const cachedAction = vrmaActionCacheRef.current.get(vrmaPlaybackRequest.url);
+      const action = cachedAction ?? await loadVrmaAction(
+        loader,
+        mixer,
+        vrm,
+        vrmaPlaybackRequest.url,
+        vrmaPlaybackRequest.name
+      );
+      if (!action || cancelled) return;
+      vrmaActionCacheRef.current.set(vrmaPlaybackRequest.url, action);
+      playOneShotAction(action, "manual", 0.15);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [playOneShotAction, vrm, vrmaPlaybackRequest]);
 
   useFrame((_, delta) => {
     if (!vrm) return;
     animationMixerRef.current?.update(delta);
-    const hasActiveVrmAnimation = activeAnimationActionRef.current !== null;
+    const hasActiveVrmAnimation =
+      activeAnimationActionRef.current !== null &&
+      activeAnimationSourceRef.current !== null;
+
+    const stateAction = animationActionsRef.current[state];
+    const now = performance.now() / 1000;
+    if (
+      stateAction &&
+      !hasActiveVrmAnimation &&
+      !showPoseDebug &&
+      !previewReference &&
+      now >= nextStateMotionAtRef.current
+    ) {
+      playOneShotAction(stateAction, "state", 0.25);
+    }
 
     const t = (performance.now() - startTimeRef.current) / 1000;
     const walk = t * profile.speed;
@@ -1795,6 +1905,8 @@ export default function AvatarFace({
   const [selectedBone, setSelectedBone] = useState<PoseDebugBoneName | null>(VRMHumanBoneName.Hips);
   const [activePresetId, setActivePresetId] = useState(DEFAULT_REFERENCE_PRESET.id);
   const [previewExpression, setPreviewExpression] = useState<AvatarExpression | null>(null);
+  const [vrmaPlaybackRequest, setVrmaPlaybackRequest] =
+    useState<VrmPlaybackRequest | null>(null);
   const canRotateCamera = process.env.NEXT_PUBLIC_ENABLE_CAMERA_ROTATION === "true";
   const canPanCamera = process.env.NEXT_PUBLIC_ENABLE_CAMERA_PAN === "true";
   const cameraZoomRatio = Math.min(
@@ -1806,7 +1918,7 @@ export default function AvatarFace({
   const canShowReferenceLibrary =
     process.env.NEXT_PUBLIC_ENABLE_MOTION_LIBRARY === "true";
   const referencePresets = useMemo(
-    () => [...REFERENCE_PRESETS, ...customPresets],
+    () => [...REFERENCE_PRESETS, ...VRMA_REFERENCE_PRESETS, ...customPresets],
     [customPresets]
   );
   const imageBackgroundUrl = getScenePreset(scenePresetId).imageUrl;
@@ -1871,6 +1983,17 @@ export default function AvatarFace({
   }, []);
 
   const selectReferencePreset = useCallback((preset: ReferencePreset) => {
+    if (preset.vrmaUrl) {
+      setActivePresetId(preset.id);
+      setPreviewExpression(preset.expression);
+      setVrmaPlaybackRequest({
+        id: Date.now(),
+        name: preset.nameEn,
+        url: preset.vrmaUrl,
+      });
+      return;
+    }
+
     setDeskPose(applyReferencePreset(basePose, preset));
     setActivePresetId(preset.id);
     setPreviewExpression(preset.expression);
@@ -2116,6 +2239,7 @@ export default function AvatarFace({
           mouthOpen={mouthOpen}
           speaking={speaking}
           deskPose={deskPose}
+          vrmaPlaybackRequest={vrmaPlaybackRequest}
           showPoseDebug={showPoseDebug}
           previewReference={showReferenceLibrary}
           selectedBone={selectedBone}
