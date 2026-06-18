@@ -47,7 +47,7 @@ export const DEFAULT_WELCOME_POSE: DeskPose = {
   [VRMHumanBoneName.RightThumbMetacarpal]: rotation(-3.0000000000000018, 0, 0),
 };
 
-export const DEFAULT_DESK_POSE = DEFAULT_STANDING_POSE;
+export const DEFAULT_DESK_POSE = DEFAULT_WELCOME_POSE;
 
 export const BONE_LABELS_ZH: Record<PoseDebugBoneName, string> = {
   [VRMHumanBoneName.Hips]: "髋部",
