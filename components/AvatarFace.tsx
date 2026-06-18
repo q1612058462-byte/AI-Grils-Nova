@@ -319,6 +319,15 @@ const movementProfile: Record<
   },
 };
 
+const DEFAULT_PROCEDURAL_MOTION_INTENSITY = 0.45;
+
+function getProceduralMotionIntensity() {
+  const value = Number(process.env.NEXT_PUBLIC_AVATAR_MOTION_INTENSITY);
+  return Number.isFinite(value)
+    ? THREE.MathUtils.clamp(value, 0, 1)
+    : DEFAULT_PROCEDURAL_MOTION_INTENSITY;
+}
+
 function VRMCharacter({
   state,
   expression,
@@ -354,6 +363,7 @@ function VRMCharacter({
   const [characterRoot, setCharacterRoot] = useState<THREE.Group | null>(null);
 
   const profile = useMemo(() => movementProfile[state], [state]);
+  const proceduralMotionIntensity = useMemo(getProceduralMotionIntensity, []);
   const boneNodes = useMemo<BoneNodeEntry[]>(() => {
     if (!vrm) return [];
     return POSE_DEBUG_BONES.flatMap((bone) => {
@@ -535,7 +545,7 @@ function VRMCharacter({
     const walk = t * profile.speed;
     const sway = Math.sin(walk * 1.3) * profile.sway;
     const speakingAmount = speaking ? 1 : 0;
-    const targetLocomotion = state === "speaking" ? 0.42 : state === "listening" ? 0.24 : state === "thinking" ? 0.18 : 0.12;
+    const targetLocomotion = state === "speaking" ? 0.24 : state === "listening" ? 0.16 : state === "thinking" ? 0.12 : 0.08;
     const targetSpeech = speakingAmount;
     const targetAttention = state === "listening" ? 0.85 : state === "thinking" ? 0.72 : state === "speaking" ? 0.58 : 0.32;
     motionBlendRef.current.locomotion = THREE.MathUtils.damp(
@@ -554,21 +564,27 @@ function VRMCharacter({
     const locomotion = motionBlendRef.current.locomotion;
     const speech = motionBlendRef.current.speech;
     const attention = motionBlendRef.current.attention;
-    const motionScale = showPoseDebug || previewReference ? 0 : 1;
-    const idleShift = Math.sin(t * 0.35) * 0.008;
-    const breath = Math.sin(t * 1.15) * 0.012;
-    const gestureBeat = Math.pow(Math.max(0, Math.sin(t * 1.05 - 0.6)), 3) * speech;
-    const secondaryGesture = Math.pow(Math.max(0, Math.sin(t * 0.73 + 2.1)), 4) * speech;
-    const conversationalLean = speech * (0.012 + gestureBeat * 0.025);
-    const weightShift = Math.sin(t * 0.31) * 0.012;
+    const motionScale =
+      showPoseDebug || previewReference ? 0 : proceduralMotionIntensity;
+    const idleShift = Math.sin(t * 0.35) * 0.0035 * motionScale;
+    const breath = Math.sin(t * 1.15) * 0.009;
+    const gestureBeat =
+      Math.pow(Math.max(0, Math.sin(t * 0.92 - 0.6)), 3) * speech * 0.42;
+    const secondaryGesture =
+      Math.pow(Math.max(0, Math.sin(t * 0.63 + 2.1)), 4) * speech * 0.34;
+    const conversationalLean = speech * (0.006 + gestureBeat * 0.012);
+    const weightShift = Math.sin(t * 0.31) * 0.004 * motionScale;
     const stanceEnergy = 0.55 + locomotion * 0.55;
 
-    vrm.scene.position.x = Math.sin(walk * 0.7) * profile.range + idleShift + weightShift;
-    vrm.scene.position.y = -1.42 + breath * 0.55;
+    vrm.scene.position.x =
+      (Math.sin(walk * 0.7) * profile.range + idleShift + weightShift) *
+      motionScale;
+    vrm.scene.position.y = -1.42 + breath * 0.4 * motionScale;
     vrm.scene.position.z = 0;
     const frontRotation = vrm.meta.metaVersion === "0" ? Math.PI : 0;
     vrm.scene.rotation.y = THREE.MathUtils.damp(vrm.scene.rotation.y, frontRotation, 8, delta);
-    vrm.scene.rotation.z = sway * 0.18 + Math.sin(t * 0.28) * 0.003;
+    vrm.scene.rotation.z =
+      (sway * 0.12 + Math.sin(t * 0.28) * 0.002) * motionScale;
 
     const hips = vrm.humanoid.getNormalizedBoneNode(VRMHumanBoneName.Hips);
     const spine = vrm.humanoid.getNormalizedBoneNode(VRMHumanBoneName.Spine);
@@ -646,10 +662,23 @@ function VRMCharacter({
       chest.rotation.z = THREE.MathUtils.damp(chest.rotation.z, poseValue(VRMHumanBoneName.Chest, "z"), 5, delta);
     }
     if (upperChest) {
-      upperChest.rotation.set(
+      upperChest.rotation.x = THREE.MathUtils.damp(
+        upperChest.rotation.x,
         poseValue(VRMHumanBoneName.UpperChest, "x"),
+        7,
+        delta
+      );
+      upperChest.rotation.y = THREE.MathUtils.damp(
+        upperChest.rotation.y,
         poseValue(VRMHumanBoneName.UpperChest, "y"),
-        poseValue(VRMHumanBoneName.UpperChest, "z")
+        7,
+        delta
+      );
+      upperChest.rotation.z = THREE.MathUtils.damp(
+        upperChest.rotation.z,
+        poseValue(VRMHumanBoneName.UpperChest, "z"),
+        7,
+        delta
       );
     }
     if (neck) {
