@@ -23,6 +23,11 @@ import {
   VRMExpressionPresetName,
   VRMUtils,
 } from "@pixiv/three-vrm";
+import {
+  VRMAnimationLoaderPlugin,
+  createVRMAnimationClip,
+  type VRMAnimation,
+} from "@pixiv/three-vrm-animation";
 import PoseDebugPanel from "@/components/PoseDebugPanel";
 import ReferenceLibraryPanel from "@/components/ReferenceLibraryPanel";
 import {
@@ -45,6 +50,7 @@ import {
   isImageScenePreset,
   type ScenePresetId,
 } from "@/lib/avatar/appearanceLibrary";
+import { getConfiguredVrmAnimations } from "@/lib/avatar/vrmaLibrary";
 
 type AvatarFaceProps = {
   state: AvatarState;
@@ -73,6 +79,8 @@ type BoneNodeEntry = {
   bone: PoseDebugBoneName;
   node: THREE.Object3D;
 };
+
+type VrmAnimationActions = Partial<Record<AvatarState, THREE.AnimationAction>>;
 
 const CUSTOM_PRESETS_STORAGE_KEY = "avatar.customPosePresets.v1";
 const DEFAULT_CUSTOM_PRESET_NAME = "默认姿势3";
@@ -359,11 +367,16 @@ function VRMCharacter({
     speech: 0.12,
     attention: 0.35,
   });
+  const animationMixerRef = useRef<THREE.AnimationMixer | null>(null);
+  const animationActionsRef = useRef<VrmAnimationActions>({});
+  const activeAnimationActionRef = useRef<THREE.AnimationAction | null>(null);
   const ikDraggingRef = useRef(false);
   const [characterRoot, setCharacterRoot] = useState<THREE.Group | null>(null);
+  const [animationRevision, setAnimationRevision] = useState(0);
 
   const profile = useMemo(() => movementProfile[state], [state]);
   const proceduralMotionIntensity = useMemo(getProceduralMotionIntensity, []);
+  const configuredAnimations = useMemo(getConfiguredVrmAnimations, []);
   const boneNodes = useMemo<BoneNodeEntry[]>(() => {
     if (!vrm) return [];
     return POSE_DEBUG_BONES.flatMap((bone) => {
@@ -538,8 +551,104 @@ function VRMCharacter({
     };
   }, [vrm]);
 
+  useEffect(() => {
+    animationMixerRef.current?.stopAllAction();
+    animationMixerRef.current = null;
+    animationActionsRef.current = {};
+    activeAnimationActionRef.current = null;
+    setAnimationRevision((current) => current + 1);
+
+    if (!vrm || configuredAnimations.length === 0) return;
+
+    let cancelled = false;
+    const mixer = new THREE.AnimationMixer(vrm.scene);
+    animationMixerRef.current = mixer;
+
+    const loader = new GLTFLoader();
+    loader.register((parser) => new VRMAnimationLoaderPlugin(parser));
+
+    void Promise.allSettled(
+      configuredAnimations.map(
+        (preset) =>
+          new Promise<void>((resolve) => {
+            loader.load(
+              preset.url,
+              (gltf) => {
+                if (cancelled) {
+                  resolve();
+                  return;
+                }
+                const vrmAnimation = (
+                  gltf.userData.vrmAnimations as VRMAnimation[] | undefined
+                )?.[0];
+                if (!vrmAnimation) {
+                  console.warn(`No VRMA animation found in ${preset.url}`);
+                  resolve();
+                  return;
+                }
+
+                const clip = createVRMAnimationClip(vrmAnimation, vrm);
+                clip.name = preset.name;
+                const action = mixer.clipAction(clip);
+                action.loop = THREE.LoopRepeat;
+                action.clampWhenFinished = false;
+                action.enabled = true;
+                action.setEffectiveWeight(0);
+                animationActionsRef.current[preset.state] = action;
+                resolve();
+              },
+              undefined,
+              (error) => {
+                if (!cancelled) {
+                  console.warn(`Failed to load VRMA animation: ${preset.url}`, error);
+                }
+                resolve();
+              }
+            );
+          })
+      )
+    ).then(() => {
+      if (!cancelled) {
+        setAnimationRevision((current) => current + 1);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      mixer.stopAllAction();
+      animationMixerRef.current = null;
+      animationActionsRef.current = {};
+      activeAnimationActionRef.current = null;
+    };
+  }, [configuredAnimations, vrm]);
+
+  useEffect(() => {
+    const actions = animationActionsRef.current;
+    const nextAction = actions[state] ?? null;
+    const previousAction = activeAnimationActionRef.current;
+
+    if (previousAction === nextAction) return;
+
+    if (nextAction) {
+      nextAction.reset();
+      nextAction.enabled = true;
+      nextAction.setEffectiveTimeScale(1);
+      nextAction.setEffectiveWeight(1);
+      nextAction.fadeIn(previousAction ? 0.35 : 0.15);
+      nextAction.play();
+    }
+
+    if (previousAction) {
+      previousAction.fadeOut(nextAction ? 0.35 : 0.15);
+    }
+
+    activeAnimationActionRef.current = nextAction;
+  }, [animationRevision, state]);
+
   useFrame((_, delta) => {
     if (!vrm) return;
+    animationMixerRef.current?.update(delta);
+    const hasActiveVrmAnimation = activeAnimationActionRef.current !== null;
 
     const t = (performance.now() - startTimeRef.current) / 1000;
     const walk = t * profile.speed;
@@ -565,7 +674,9 @@ function VRMCharacter({
     const speech = motionBlendRef.current.speech;
     const attention = motionBlendRef.current.attention;
     const motionScale =
-      showPoseDebug || previewReference ? 0 : proceduralMotionIntensity;
+      showPoseDebug || previewReference || hasActiveVrmAnimation
+        ? 0
+        : proceduralMotionIntensity;
     const idleShift = Math.sin(t * 0.35) * 0.0035 * motionScale;
     const breath = Math.sin(t * 1.15) * 0.009;
     const gestureBeat =
@@ -612,7 +723,7 @@ function VRMCharacter({
       axis: keyof PoseEulerDegrees
     ) => degreesToRadians(deskPose[bone][axis]);
 
-    if (!ikDraggingRef.current) {
+    if (!ikDraggingRef.current && !hasActiveVrmAnimation) {
     if (hips) {
       hips.rotation.x = THREE.MathUtils.damp(
         hips.rotation.x,
