@@ -60,6 +60,7 @@ type AvatarFaceProps = {
   speaking: boolean;
   scenePresetId: ScenePresetId;
   modelUrl: string;
+  customBackgroundUrl?: string | null;
 };
 
 type VRMCharacterProps = AvatarFaceProps & {
@@ -95,11 +96,11 @@ const CUSTOM_PRESETS_STORAGE_KEY = "avatar.customPosePresets.v1";
 const DEFAULT_CUSTOM_PRESET_NAME = "默认背手2";
 const DEFAULT_REFERENCE_PRESET =
   REFERENCE_PRESETS.find((preset) => preset.id === "default-welcome") ?? REFERENCE_PRESETS[0];
-const VRM_VIEWER_MODEL_SCALE = 1;
+const VRM_VIEWER_MODEL_SCALE = 1.16;
 const VRM_VIEWER_MODEL_POSITION = new THREE.Vector3(0, 0, 0);
-const VRM_VIEWER_CAMERA_POSITION: [number, number, number] = [0, 1.2, 5];
+const VRM_VIEWER_CAMERA_POSITION: [number, number, number] = [0, 1.2, 3.6];
 const VRM_VIEWER_CAMERA_TARGET: [number, number, number] = [0, 1.2, 0];
-const VRM_VIEWER_CAMERA_DISTANCE = 5;
+const VRM_VIEWER_CAMERA_DISTANCE = 3.6;
 
 const expressionToVrmPreset: Record<AvatarExpression, string> = {
   neutral: VRMExpressionPresetName.Neutral,
@@ -1953,6 +1954,7 @@ export default function AvatarFace({
   speaking,
   scenePresetId,
   modelUrl,
+  customBackgroundUrl,
 }: AvatarFaceProps) {
   const [showPoseDebug, setShowPoseDebug] = useState(false);
   const [showReferenceLibrary, setShowReferenceLibrary] = useState(false);
@@ -1986,7 +1988,7 @@ export default function AvatarFace({
     () => [...REFERENCE_PRESETS, ...VRMA_REFERENCE_PRESETS, ...customPresets],
     [customPresets]
   );
-  const imageBackgroundUrl = getScenePreset(scenePresetId).imageUrl;
+  const imageBackgroundUrl = customBackgroundUrl ?? getScenePreset(scenePresetId).imageUrl;
   const cameraPosition = useMemo<[number, number, number]>(
     () => [
       VRM_VIEWER_CAMERA_POSITION[0],

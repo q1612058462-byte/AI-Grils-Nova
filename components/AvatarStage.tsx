@@ -50,8 +50,10 @@ type AvatarStageProps = {
   onDeleteSession: (id: string) => void;
   scenePresetId: ScenePresetId;
   avatarModelUrl: string;
+  customBackgroundUrl?: string | null;
   onScenePresetChange: (id: ScenePresetId) => void;
   onAvatarModelChange: (url: string) => void;
+  onBackgroundUpload: (url: string | null) => void;
   modelApiSettings: ModelApiSettings;
   onModelApiSettingsChange: (settings: ModelApiSettings) => void;
 };
@@ -89,8 +91,10 @@ export default function AvatarStage({
   onDeleteSession,
   scenePresetId,
   avatarModelUrl,
+  customBackgroundUrl,
   onScenePresetChange,
   onAvatarModelChange,
+  onBackgroundUpload,
   modelApiSettings,
   onModelApiSettingsChange,
 }: AvatarStageProps) {
@@ -115,6 +119,7 @@ export default function AvatarStage({
           speaking={state === "speaking"}
           scenePresetId={scenePresetId}
           modelUrl={avatarModelUrl}
+          customBackgroundUrl={customBackgroundUrl}
         />
         <SceneControlDock
           state={state}
@@ -127,8 +132,10 @@ export default function AvatarStage({
           onDeleteSession={onDeleteSession}
           scenePresetId={scenePresetId}
           avatarModelUrl={avatarModelUrl}
+          customBackgroundUrl={customBackgroundUrl}
           onScenePresetChange={onScenePresetChange}
           onAvatarModelChange={onAvatarModelChange}
+          onBackgroundUpload={onBackgroundUpload}
           modelApiSettings={modelApiSettings}
           onModelApiSettingsChange={onModelApiSettingsChange}
           historyOpen={historyOpen}

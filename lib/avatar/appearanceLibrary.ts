@@ -86,6 +86,21 @@ export function isImageScenePreset(id: ScenePresetId) {
   return Boolean(getScenePreset(id).imageUrl);
 }
 
+const envAvatarPreset = (
+  index: number,
+  name: string | undefined,
+  url: string | undefined
+): AvatarPreset | null => {
+  if (!url) return null;
+
+  return {
+    id: `avatar-${index}`,
+    name: name || `Avatar ${index}`,
+    description: "通过环境变量配置的 VRM 角色。",
+    modelUrl: url,
+  };
+};
+
 export const AVATAR_PRESETS: AvatarPreset[] = [
   {
     id: "nora",
@@ -93,20 +108,9 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     description: "当前内置的 VRM 角色。",
     modelUrl: process.env.NEXT_PUBLIC_VRM_MODEL_URL || "/models/nora.vrm",
   },
-  process.env.NEXT_PUBLIC_VRM_MODEL_URL_2
-    ? {
-        id: "avatar-2",
-        name: process.env.NEXT_PUBLIC_VRM_MODEL_NAME_2 || "角色 2",
-        description: "通过环境变量配置的 VRM 角色。",
-        modelUrl: process.env.NEXT_PUBLIC_VRM_MODEL_URL_2,
-      }
-    : null,
-  process.env.NEXT_PUBLIC_VRM_MODEL_URL_3
-    ? {
-        id: "avatar-3",
-        name: process.env.NEXT_PUBLIC_VRM_MODEL_NAME_3 || "角色 3",
-        description: "通过环境变量配置的 VRM 角色。",
-        modelUrl: process.env.NEXT_PUBLIC_VRM_MODEL_URL_3,
-      }
-    : null,
+  envAvatarPreset(2, process.env.NEXT_PUBLIC_VRM_MODEL_NAME_2, process.env.NEXT_PUBLIC_VRM_MODEL_URL_2),
+  envAvatarPreset(3, process.env.NEXT_PUBLIC_VRM_MODEL_NAME_3, process.env.NEXT_PUBLIC_VRM_MODEL_URL_3),
+  envAvatarPreset(4, process.env.NEXT_PUBLIC_VRM_MODEL_NAME_4, process.env.NEXT_PUBLIC_VRM_MODEL_URL_4),
+  envAvatarPreset(5, process.env.NEXT_PUBLIC_VRM_MODEL_NAME_5, process.env.NEXT_PUBLIC_VRM_MODEL_URL_5),
+  envAvatarPreset(6, process.env.NEXT_PUBLIC_VRM_MODEL_NAME_6, process.env.NEXT_PUBLIC_VRM_MODEL_URL_6),
 ].filter((preset): preset is AvatarPreset => preset !== null);

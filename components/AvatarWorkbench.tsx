@@ -141,6 +141,7 @@ export default function AvatarWorkbench() {
   const [voiceSettings, setVoiceSettings] = useState(DEFAULT_VOICE_SETTINGS);
   const [scenePresetId, setScenePresetId] = useState<ScenePresetId>("sunset-street");
   const [avatarModelUrl, setAvatarModelUrl] = useState(AVATAR_PRESETS[0].modelUrl);
+  const [customBackgroundUrl, setCustomBackgroundUrl] = useState<string | null>(null);
   const [modelApiSettings, setModelApiSettings] = useState(DEFAULT_MODEL_API_SETTINGS);
   const [uiLanguage, setUiLanguage] = useState<UiLanguage>("en");
 
@@ -152,6 +153,8 @@ export default function AvatarWorkbench() {
   const sentenceExpressionRef = useRef<AvatarExpression>("smile");
   const cloudTtsUnavailableRef = useRef(false);
   const saveConversationsTimerRef = useRef<number | null>(null);
+  const uploadedAvatarUrlRef = useRef<string | null>(null);
+  const uploadedBackgroundUrlRef = useRef<string | null>(null);
 
   const nextId = useMemo(() => {
     let counter = 0;
@@ -264,7 +267,11 @@ export default function AvatarWorkbench() {
         ) {
           setScenePresetId(parsed.scenePresetId);
         }
-        if (typeof parsed.avatarModelUrl === "string" && parsed.avatarModelUrl.trim()) {
+        if (
+          typeof parsed.avatarModelUrl === "string" &&
+          parsed.avatarModelUrl.trim() &&
+          !parsed.avatarModelUrl.startsWith("blob:")
+        ) {
           setAvatarModelUrl(parsed.avatarModelUrl);
         }
       } catch {
@@ -772,18 +779,36 @@ export default function AvatarWorkbench() {
     setScenePresetId(id);
     window.localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify({
       scenePresetId: id,
-      avatarModelUrl,
+      avatarModelUrl: avatarModelUrl.startsWith("blob:") ? AVATAR_PRESETS[0].modelUrl : avatarModelUrl,
     }));
   }, [avatarModelUrl]);
   const updateAvatarModel = useCallback((url: string) => {
     const normalized = url.trim();
     if (!normalized) return;
+    if (uploadedAvatarUrlRef.current && uploadedAvatarUrlRef.current !== normalized) {
+      URL.revokeObjectURL(uploadedAvatarUrlRef.current);
+      uploadedAvatarUrlRef.current = null;
+    }
+    if (normalized.startsWith("blob:")) {
+      uploadedAvatarUrlRef.current = normalized;
+    }
     setAvatarModelUrl(normalized);
+    if (normalized.startsWith("blob:")) return;
     window.localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify({
       scenePresetId,
       avatarModelUrl: normalized,
     }));
   }, [scenePresetId]);
+  const updateUploadedBackground = useCallback((url: string | null) => {
+    if (uploadedBackgroundUrlRef.current) {
+      URL.revokeObjectURL(uploadedBackgroundUrlRef.current);
+      uploadedBackgroundUrlRef.current = null;
+    }
+    if (url) {
+      uploadedBackgroundUrlRef.current = url;
+    }
+    setCustomBackgroundUrl(url);
+  }, []);
   const updateModelApiSettings = useCallback((settings: ModelApiSettings) => {
     const normalized = normalizeModelApiSettings(settings);
     setModelApiSettings(normalized);
@@ -795,6 +820,13 @@ export default function AvatarWorkbench() {
   const updateUiLanguage = useCallback((language: UiLanguage) => {
     setUiLanguage(language);
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, language);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (uploadedAvatarUrlRef.current) URL.revokeObjectURL(uploadedAvatarUrlRef.current);
+      if (uploadedBackgroundUrlRef.current) URL.revokeObjectURL(uploadedBackgroundUrlRef.current);
+    };
   }, []);
 
   return (
@@ -835,8 +867,10 @@ export default function AvatarWorkbench() {
         onDeleteSession={deleteSession}
         scenePresetId={scenePresetId}
         avatarModelUrl={avatarModelUrl}
+        customBackgroundUrl={customBackgroundUrl}
         onScenePresetChange={updateScenePreset}
         onAvatarModelChange={updateAvatarModel}
+        onBackgroundUpload={updateUploadedBackground}
         modelApiSettings={modelApiSettings}
         onModelApiSettingsChange={updateModelApiSettings}
       />

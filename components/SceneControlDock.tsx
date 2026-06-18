@@ -23,8 +23,10 @@ type SceneControlDockProps = {
   onDeleteSession: (id: string) => void;
   scenePresetId: ScenePresetId;
   avatarModelUrl: string;
+  customBackgroundUrl?: string | null;
   onScenePresetChange: (id: ScenePresetId) => void;
   onAvatarModelChange: (url: string) => void;
+  onBackgroundUpload: (url: string | null) => void;
   modelApiSettings: ModelApiSettings;
   onModelApiSettingsChange: (settings: ModelApiSettings) => void;
   historyOpen: boolean;
@@ -49,8 +51,10 @@ export default function SceneControlDock({
   onDeleteSession,
   scenePresetId,
   avatarModelUrl,
+  customBackgroundUrl,
   onScenePresetChange,
   onAvatarModelChange,
+  onBackgroundUpload,
   modelApiSettings,
   onModelApiSettingsChange,
   historyOpen,
@@ -142,8 +146,10 @@ export default function SceneControlDock({
                 <AppearancePanel
                   scenePresetId={scenePresetId}
                   avatarModelUrl={avatarModelUrl}
+                  customBackgroundUrl={customBackgroundUrl}
                   onScenePresetChange={onScenePresetChange}
                   onAvatarModelChange={onAvatarModelChange}
+                  onBackgroundUpload={onBackgroundUpload}
                 />
               ) : panel === "settings" ? (
                 <ModelSettingsPanel
@@ -307,13 +313,17 @@ function SettingsField({
 function AppearancePanel({
   scenePresetId,
   avatarModelUrl,
+  customBackgroundUrl,
   onScenePresetChange,
   onAvatarModelChange,
+  onBackgroundUpload,
 }: {
   scenePresetId: ScenePresetId;
   avatarModelUrl: string;
+  customBackgroundUrl?: string | null;
   onScenePresetChange: (id: ScenePresetId) => void;
   onAvatarModelChange: (url: string) => void;
+  onBackgroundUpload: (url: string | null) => void;
 }) {
   const { language } = useUiLanguage();
   const t = (en: string, zh: string) => uiText(language, en, zh);
@@ -355,6 +365,36 @@ function AppearancePanel({
               </span>
             </button>
           ))}
+        </div>
+        <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <label className="text-xs text-slate-400">{t("Upload background image", "上传背景图片")}</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              onBackgroundUpload(URL.createObjectURL(file));
+              event.currentTarget.value = "";
+            }}
+            className="mt-2 block w-full cursor-pointer rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-400/15 file:px-3 file:py-1.5 file:text-cyan-100"
+          />
+          <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500">
+            <span>
+              {customBackgroundUrl
+                ? t("Custom image is active for this browser session.", "当前浏览器会话正在使用自定义背景。")
+                : t("PNG, JPG, or WebP files work best.", "推荐使用 PNG、JPG 或 WebP 图片。")}
+            </span>
+            {customBackgroundUrl ? (
+              <button
+                type="button"
+                onClick={() => onBackgroundUpload(null)}
+                className="shrink-0 rounded-lg border border-white/10 px-3 py-1.5 text-slate-300 hover:bg-white/10 hover:text-white"
+              >
+                {t("Clear", "清除")}
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -410,6 +450,26 @@ function AppearancePanel({
             )}
           </p>
         </form>
+        <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <label className="text-xs text-slate-400">{t("Upload VRM file", "上传 VRM 文件")}</label>
+          <input
+            type="file"
+            accept=".vrm,model/gltf-binary"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              onAvatarModelChange(URL.createObjectURL(file));
+              event.currentTarget.value = "";
+            }}
+            className="mt-2 block w-full cursor-pointer rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-400/15 file:px-3 file:py-1.5 file:text-cyan-100"
+          />
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            {t(
+              "Uploaded VRM files are temporary previews. Put final models in public/models or configure them in .env.",
+              "上传的 VRM 只用于临时预览。最终模型建议放入 public/models 或在 .env 中配置。"
+            )}
+          </p>
+        </div>
       </div>
     </div>
   );
