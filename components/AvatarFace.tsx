@@ -91,9 +91,6 @@ type VrmPlaybackRequest = {
 };
 
 const CUSTOM_PRESETS_STORAGE_KEY = "avatar.customPosePresets.v1";
-const DEFAULT_CUSTOM_PRESET_NAME = "默认姿势3";
-const DEFAULT_REFERENCE_PRESET =
-  REFERENCE_PRESETS.find((preset) => preset.id === "default-welcome") ?? REFERENCE_PRESETS[0];
 const VRM_VIEWER_MODEL_SCALE = 1;
 const VRM_VIEWER_MODEL_POSITION = new THREE.Vector3(0, 0, 0);
 const VRM_VIEWER_CAMERA_POSITION: [number, number, number] = [0, 1, 5];
@@ -1903,15 +1900,13 @@ export default function AvatarFace({
   const [showReferenceLibrary, setShowReferenceLibrary] = useState(false);
   const [enableCharacterMove, setEnableCharacterMove] = useState(false);
   const [characterPosition, setCharacterPosition] = useState<[number, number, number]>([0, 0, 0]);
-  const [deskPose, setDeskPose] = useState<DeskPose>(() =>
-    applyReferencePreset(DEFAULT_DESK_POSE, DEFAULT_REFERENCE_PRESET)
-  );
+  const [deskPose, setDeskPose] = useState<DeskPose>(() => cloneDeskPose(DEFAULT_DESK_POSE));
   const [basePose, setBasePose] = useState<DeskPose>(() => cloneDeskPose(DEFAULT_DESK_POSE));
   const [customPresets, setCustomPresets] = useState<ReferencePreset[]>([]);
   const [customPresetsLoaded, setCustomPresetsLoaded] = useState(false);
   const [availableBones, setAvailableBones] = useState<Set<PoseDebugBoneName>>(() => new Set());
   const [selectedBone, setSelectedBone] = useState<PoseDebugBoneName | null>(VRMHumanBoneName.Hips);
-  const [activePresetId, setActivePresetId] = useState(DEFAULT_REFERENCE_PRESET.id);
+  const [activePresetId, setActivePresetId] = useState("");
   const [previewExpression, setPreviewExpression] = useState<AvatarExpression | null>(null);
   const [vrmaPlaybackRequest, setVrmaPlaybackRequest] =
     useState<VrmPlaybackRequest | null>(null);
@@ -1948,16 +1943,6 @@ export default function AvatarFace({
           );
           setCustomPresets(presets);
 
-          const defaultPreset = presets.find(
-            (preset) =>
-              preset.nameZh === DEFAULT_CUSTOM_PRESET_NAME ||
-              preset.nameEn === DEFAULT_CUSTOM_PRESET_NAME
-          );
-          if (defaultPreset) {
-            setDeskPose(applyReferencePreset(DEFAULT_DESK_POSE, defaultPreset));
-            setActivePresetId(defaultPreset.id);
-            setPreviewExpression(defaultPreset.expression);
-          }
         }
       }
     } catch {
@@ -2019,7 +2004,7 @@ export default function AvatarFace({
 
   const setCurrentAsBasePose = useCallback(() => {
     setBasePose(cloneDeskPose(deskPose));
-    setActivePresetId(REFERENCE_PRESETS[0].id);
+    setActivePresetId("");
   }, [deskPose]);
 
   const saveCurrentPose = useCallback((name: string) => {
@@ -2038,7 +2023,7 @@ export default function AvatarFace({
 
   const deleteCustomPose = useCallback((id: string) => {
     setCustomPresets((current) => current.filter((preset) => preset.id !== id));
-    setActivePresetId((current) => current === id ? REFERENCE_PRESETS[0].id : current);
+    setActivePresetId((current) => current === id ? "" : current);
   }, []);
 
   const moveCharacterBy = useCallback((delta: THREE.Vector3) => {
