@@ -48,6 +48,7 @@ const CONVERSATIONS_STORAGE_KEY = "avatar.conversations.v1";
 const APPEARANCE_STORAGE_KEY = "avatar.appearance.v1";
 const MODEL_API_SETTINGS_STORAGE_KEY = "avatar.modelApiSettings.v1";
 const UI_LANGUAGE_STORAGE_KEY = "avatar.uiLanguage.v1";
+const CONVERSATIONS_API_PATH = "/api/conversations";
 const DEFAULT_VOICE_SETTINGS: BrowserVoiceSettings = {
   engine: "cloud",
   cloudProvider: "doubao",
@@ -92,6 +93,32 @@ function isConversation(value: unknown): value is AvatarConversation {
   );
 }
 
+function normalizeStoredConversations(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return { sessions: [] as AvatarConversation[], activeSessionId: null };
+  }
+  const parsed = value as {
+    sessions?: unknown;
+    activeSessionId?: unknown;
+  };
+  const sessions = Array.isArray(parsed.sessions)
+    ? parsed.sessions.filter(isConversation)
+    : [];
+  const activeSessionId =
+    typeof parsed.activeSessionId === "string" &&
+    sessions.some((session) => session.id === parsed.activeSessionId)
+      ? parsed.activeSessionId
+      : sessions[0]?.id ?? null;
+  return { sessions, activeSessionId };
+}
+
+function getConversationsTimestamp(sessions: AvatarConversation[]) {
+  return sessions.reduce(
+    (latest, session) => Math.max(latest, session.updatedAt, session.createdAt),
+    0
+  );
+}
+
 function getConversationTitle(prompt: string) {
   const normalized = prompt.replace(/\s+/g, " ").trim();
   return normalized.length > 18 ? `${normalized.slice(0, 18)}...` : normalized;
@@ -124,6 +151,7 @@ export default function AvatarWorkbench() {
   const speechGenerationRef = useRef(0);
   const sentenceExpressionRef = useRef<AvatarExpression>("smile");
   const cloudTtsUnavailableRef = useRef(false);
+  const saveConversationsTimerRef = useRef<number | null>(null);
 
   const nextId = useMemo(() => {
     let counter = 0;
@@ -171,29 +199,51 @@ export default function AvatarWorkbench() {
   }, [stopLipSync]);
 
   useEffect(() => {
-    const storedSessions = window.localStorage.getItem(CONVERSATIONS_STORAGE_KEY);
-    if (storedSessions) {
+    let cancelled = false;
+
+    const hydrateConversations = async () => {
+      let localConversations = {
+        sessions: [] as AvatarConversation[],
+        activeSessionId: null as string | null,
+      };
+      const storedSessions = window.localStorage.getItem(CONVERSATIONS_STORAGE_KEY);
+      if (storedSessions) {
+        try {
+          localConversations = normalizeStoredConversations(JSON.parse(storedSessions));
+        } catch {
+          window.localStorage.removeItem(CONVERSATIONS_STORAGE_KEY);
+        }
+      }
+
+      let serverConversations = {
+        sessions: [] as AvatarConversation[],
+        activeSessionId: null as string | null,
+      };
       try {
-        const parsed = JSON.parse(storedSessions) as {
-          sessions?: unknown;
-          activeSessionId?: unknown;
-        };
-        const restored = Array.isArray(parsed.sessions)
-          ? parsed.sessions.filter(isConversation)
-          : [];
-        if (restored.length > 0) {
-          setSessions(restored);
-          const restoredActiveId = typeof parsed.activeSessionId === "string" &&
-            restored.some((session) => session.id === parsed.activeSessionId)
-            ? parsed.activeSessionId
-            : restored[0].id;
-          setActiveSessionId(restoredActiveId);
+        const response = await fetch(CONVERSATIONS_API_PATH, { cache: "no-store" });
+        if (response.ok) {
+          serverConversations = normalizeStoredConversations(await response.json());
         }
       } catch {
-        window.localStorage.removeItem(CONVERSATIONS_STORAGE_KEY);
+        // Local browser storage remains the fallback when the server store is unavailable.
       }
-    }
-    setSessionsHydrated(true);
+
+      if (cancelled) return;
+
+      const restored =
+        getConversationsTimestamp(serverConversations.sessions) >
+        getConversationsTimestamp(localConversations.sessions)
+          ? serverConversations
+          : localConversations;
+
+      if (restored.sessions.length > 0) {
+        setSessions(restored.sessions);
+        setActiveSessionId(restored.activeSessionId ?? restored.sessions[0].id);
+      }
+      setSessionsHydrated(true);
+    };
+
+    void hydrateConversations();
 
     const storedAppearance = window.localStorage.getItem(APPEARANCE_STORAGE_KEY);
     if (storedAppearance) {
@@ -298,6 +348,10 @@ export default function AvatarWorkbench() {
     window.speechSynthesis?.addEventListener("voiceschanged", refreshVoices);
 
     return () => {
+      cancelled = true;
+      if (saveConversationsTimerRef.current) {
+        window.clearTimeout(saveConversationsTimerRef.current);
+      }
       window.speechSynthesis?.removeEventListener("voiceschanged", refreshVoices);
       lipSyncStopRef.current?.();
       modelAbortRef.current?.abort();
@@ -308,10 +362,29 @@ export default function AvatarWorkbench() {
 
   useEffect(() => {
     if (!sessionsHydrated) return;
-    window.localStorage.setItem(CONVERSATIONS_STORAGE_KEY, JSON.stringify({
+    const payload = {
       sessions,
       activeSessionId,
-    }));
+    };
+    const serializedPayload = JSON.stringify(payload);
+    try {
+      window.localStorage.setItem(CONVERSATIONS_STORAGE_KEY, serializedPayload);
+    } catch {
+      // Long histories can exceed browser storage quotas. The local file store
+      // remains the durable source in the desktop/dev app.
+    }
+    if (saveConversationsTimerRef.current) {
+      window.clearTimeout(saveConversationsTimerRef.current);
+    }
+    saveConversationsTimerRef.current = window.setTimeout(() => {
+      void fetch(CONVERSATIONS_API_PATH, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: serializedPayload,
+      }).catch(() => {
+        // The browser cache has already been updated; server persistence can retry later.
+      });
+    }, 250);
   }, [activeSessionId, sessions, sessionsHydrated]);
 
   const activeDialogue = useMemo(

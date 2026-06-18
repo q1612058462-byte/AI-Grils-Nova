@@ -7,6 +7,7 @@ dist
 *.log
 *.tsbuildinfo
 tmp/
+.avatar-data/
 .vercel/
 .DS_Store
 Thumbs.db
