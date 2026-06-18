@@ -12,7 +12,7 @@ import {
   useGLTF,
   useTexture,
 } from "@react-three/drei";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -71,6 +71,7 @@ type VRMCharacterProps = AvatarFaceProps & {
   characterPosition: [number, number, number];
   enableCharacterMove: boolean;
   onSelectBone: (bone: PoseDebugBoneName) => void;
+  onCameraFocusChange: (target: [number, number, number]) => void;
   onCharacterPositionChange: (position: [number, number, number]) => void;
   onCharacterPositionDelta: (delta: THREE.Vector3) => void;
   onBoneRotationChange: (bone: PoseDebugBoneName, rotation: PoseEulerDegrees) => void;
@@ -108,6 +109,31 @@ const expressionToVrmPreset: Record<AvatarExpression, string> = {
   comfort: VRMExpressionPresetName.Sad,
   surprised: VRMExpressionPresetName.Surprised,
 };
+
+const MANAGED_EXPRESSION_PRESETS = Array.from(
+  new Set([
+    ...Object.values(expressionToVrmPreset),
+    VRMExpressionPresetName.Aa,
+    VRMExpressionPresetName.Ih,
+    VRMExpressionPresetName.Ou,
+    VRMExpressionPresetName.Blink,
+  ])
+);
+
+type CameraFocusControllerProps = {
+  position: [number, number, number];
+};
+
+function CameraFocusController({ position }: CameraFocusControllerProps) {
+  const { camera } = useThree();
+
+  useEffect(() => {
+    camera.position.set(position[0], position[1], position[2]);
+    camera.updateProjectionMatrix();
+  }, [camera, position]);
+
+  return null;
+}
 
 function applyDeskPose(vrm: VRM, deskPose: DeskPose) {
   for (const bone of POSE_DEBUG_BONES) {
@@ -423,6 +449,7 @@ function VRMCharacter({
   characterPosition,
   enableCharacterMove,
   onSelectBone,
+  onCameraFocusChange,
   onCharacterPositionChange,
   onCharacterPositionDelta,
   onBoneRotationChange,
@@ -437,6 +464,7 @@ function VRMCharacter({
     nextBlink: 2.4,
     progress: -1,
   });
+  const expressionWeightsRef = useRef<Record<string, number>>({});
   const motionBlendRef = useRef({
     locomotion: 0.2,
     speech: 0.12,
@@ -553,6 +581,21 @@ function VRMCharacter({
     const { x, y, z } = characterRoot.position;
     onCharacterPositionChange([x, y, z]);
   }, [characterRoot, onCharacterPositionChange]);
+
+  useEffect(() => {
+    if (!vrm) return;
+
+    vrm.scene.updateMatrixWorld(true);
+    const head = vrm.humanoid.getNormalizedBoneNode(VRMHumanBoneName.Head);
+    if (!head) return;
+
+    const headPosition = head.getWorldPosition(new THREE.Vector3());
+    onCameraFocusChange([
+      headPosition.x,
+      headPosition.y + 0.02,
+      headPosition.z,
+    ]);
+  }, [characterPosition, onCameraFocusChange, vrm]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1250,14 +1293,16 @@ function VRMCharacter({
 
     const expressionManager = vrm.expressionManager;
     if (expressionManager) {
-      expressionManager.resetValues();
-      expressionManager.setValue(expressionToVrmPreset[expression], expression === "neutral" ? 0.7 : 0.82);
-
+      const targetExpressionValues: Record<string, number> = {};
+      for (const preset of MANAGED_EXPRESSION_PRESETS) {
+        targetExpressionValues[preset] = 0;
+      }
+      targetExpressionValues[expressionToVrmPreset[expression]] = expression === "neutral" ? 0.55 : 0.82;
       const mouthPhase = t * 8.5;
       const roundedVowel = (Math.sin(mouthPhase * 0.73) + 1) * 0.5;
-      expressionManager.setValue(VRMExpressionPresetName.Aa, mouthOpen * (0.58 + roundedVowel * 0.22));
-      expressionManager.setValue(VRMExpressionPresetName.Ih, mouthOpen * (1 - roundedVowel) * 0.24);
-      expressionManager.setValue(VRMExpressionPresetName.Ou, mouthOpen * roundedVowel * 0.24);
+      targetExpressionValues[VRMExpressionPresetName.Aa] = mouthOpen * (0.58 + roundedVowel * 0.22);
+      targetExpressionValues[VRMExpressionPresetName.Ih] = mouthOpen * (1 - roundedVowel) * 0.24;
+      targetExpressionValues[VRMExpressionPresetName.Ou] = mouthOpen * roundedVowel * 0.24;
 
       const blinkState = blinkRef.current;
       blinkState.elapsed += delta;
@@ -1274,7 +1319,17 @@ function VRMCharacter({
           blinkState.nextBlink = 2.2 + Math.random() * 3.2;
         }
       }
-      expressionManager.setValue(VRMExpressionPresetName.Blink, blink);
+      targetExpressionValues[VRMExpressionPresetName.Blink] = blink;
+
+      const expressionWeights = expressionWeightsRef.current;
+      for (const preset of MANAGED_EXPRESSION_PRESETS) {
+        const current = expressionWeights[preset] ?? 0;
+        const target = targetExpressionValues[preset] ?? 0;
+        const next = THREE.MathUtils.damp(current, target, 14, delta);
+        const normalized = Math.abs(next) < 0.001 ? 0 : next;
+        expressionWeights[preset] = normalized;
+        expressionManager.setValue(preset, normalized);
+      }
     }
 
     vrm.update(delta);
@@ -1903,6 +1958,8 @@ export default function AvatarFace({
   const [showReferenceLibrary, setShowReferenceLibrary] = useState(false);
   const [enableCharacterMove, setEnableCharacterMove] = useState(false);
   const [characterPosition, setCharacterPosition] = useState<[number, number, number]>([0, 0, 0]);
+  const [cameraFocusTarget, setCameraFocusTarget] =
+    useState<[number, number, number]>(VRM_VIEWER_CAMERA_TARGET);
   const [deskPose, setDeskPose] = useState<DeskPose>(() =>
     applyReferencePreset(DEFAULT_DESK_POSE, DEFAULT_REFERENCE_PRESET)
   );
@@ -1930,6 +1987,14 @@ export default function AvatarFace({
     [customPresets]
   );
   const imageBackgroundUrl = getScenePreset(scenePresetId).imageUrl;
+  const cameraPosition = useMemo<[number, number, number]>(
+    () => [
+      VRM_VIEWER_CAMERA_POSITION[0],
+      cameraFocusTarget[1],
+      VRM_VIEWER_CAMERA_POSITION[2],
+    ],
+    [cameraFocusTarget]
+  );
 
   useEffect(() => {
     try {
@@ -2151,6 +2216,7 @@ export default function AvatarFace({
           gl.shadowMap.type = THREE.PCFSoftShadowMap;
         }}
       >
+        <CameraFocusController position={cameraPosition} />
         {!imageBackgroundUrl ? (
           <>
             <color
@@ -2199,7 +2265,7 @@ export default function AvatarFace({
         )}
         <OrbitControls
           makeDefault
-          target={VRM_VIEWER_CAMERA_TARGET}
+          target={cameraFocusTarget}
           enableDamping
           dampingFactor={0.08}
           screenSpacePanning
@@ -2261,6 +2327,7 @@ export default function AvatarFace({
           onAvailableBonesChange={updateAvailableBones}
           scenePresetId={scenePresetId}
           modelUrl={modelUrl}
+          onCameraFocusChange={setCameraFocusTarget}
         />
       </Canvas>
     </div>
