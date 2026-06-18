@@ -94,6 +94,11 @@ const CUSTOM_PRESETS_STORAGE_KEY = "avatar.customPosePresets.v1";
 const DEFAULT_CUSTOM_PRESET_NAME = "默认姿势3";
 const DEFAULT_REFERENCE_PRESET =
   REFERENCE_PRESETS.find((preset) => preset.id === "default-welcome") ?? REFERENCE_PRESETS[0];
+const VRM_VIEWER_MODEL_SCALE = 1;
+const VRM_VIEWER_MODEL_POSITION = new THREE.Vector3(0, 0, 0);
+const VRM_VIEWER_CAMERA_POSITION: [number, number, number] = [0, 1, 5];
+const VRM_VIEWER_CAMERA_TARGET: [number, number, number] = [0, 1, 0];
+const VRM_VIEWER_CAMERA_DISTANCE = 5;
 
 const expressionToVrmPreset: Record<AvatarExpression, string> = {
   neutral: VRMExpressionPresetName.Neutral,
@@ -574,10 +579,11 @@ function VRMCharacter({
           VRMUtils.rotateVRM0(loadedVrm);
         }
 
-        loadedVrm.scene.scale.setScalar(1.58);
-        loadedVrm.scene.position.set(0, -1.42, 0);
-        loadedVrm.scene.rotation.set(0, loadedVrm.meta.metaVersion === "0" ? Math.PI : 0, 0);
+        loadedVrm.scene.scale.setScalar(VRM_VIEWER_MODEL_SCALE);
+        loadedVrm.scene.position.copy(VRM_VIEWER_MODEL_POSITION);
+        loadedVrm.scene.rotation.set(0, Math.PI, 0);
         loadedVrm.scene.traverse((object) => {
+          object.frustumCulled = false;
           if (!(object instanceof THREE.Mesh)) return;
           object.castShadow = true;
           object.receiveShadow = true;
@@ -798,11 +804,13 @@ function VRMCharacter({
     const stanceEnergy = 0.55 + locomotion * 0.55;
 
     vrm.scene.position.x =
+      VRM_VIEWER_MODEL_POSITION.x +
       (Math.sin(walk * 0.7) * profile.range + idleShift + weightShift) *
-      motionScale;
-    vrm.scene.position.y = -1.42 + breath * 0.4 * motionScale;
-    vrm.scene.position.z = 0;
-    const frontRotation = vrm.meta.metaVersion === "0" ? Math.PI : 0;
+        motionScale;
+    vrm.scene.position.y =
+      VRM_VIEWER_MODEL_POSITION.y + breath * 0.4 * motionScale;
+    vrm.scene.position.z = VRM_VIEWER_MODEL_POSITION.z;
+    const frontRotation = Math.PI;
     vrm.scene.rotation.y = THREE.MathUtils.damp(vrm.scene.rotation.y, frontRotation, 8, delta);
     vrm.scene.rotation.z =
       (sway * 0.12 + Math.sin(t * 0.28) * 0.002) * motionScale;
@@ -1913,7 +1921,7 @@ export default function AvatarFace({
     3,
     Math.max(1.05, Number(process.env.NEXT_PUBLIC_CAMERA_ZOOM_RATIO) || 1.6)
   );
-  const defaultCameraDistance = 3.45;
+  const defaultCameraDistance = VRM_VIEWER_CAMERA_DISTANCE;
   const canShowPoseDebug = process.env.NEXT_PUBLIC_ENABLE_POSE_DEBUG === "true";
   const canShowReferenceLibrary =
     process.env.NEXT_PUBLIC_ENABLE_MOTION_LIBRARY === "true";
@@ -2133,7 +2141,7 @@ export default function AvatarFace({
       <Canvas
         shadows
         dpr={[1.25, 2]}
-        camera={{ position: [0, 0.66, 3.45], fov: 30 }}
+        camera={{ position: VRM_VIEWER_CAMERA_POSITION, fov: 30 }}
         gl={{ antialias: true, alpha: true }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
@@ -2191,9 +2199,10 @@ export default function AvatarFace({
         )}
         <OrbitControls
           makeDefault
-          target={[0, 0.46, 0]}
+          target={VRM_VIEWER_CAMERA_TARGET}
           enableDamping
           dampingFactor={0.08}
+          screenSpacePanning
           enableRotate={canRotateCamera}
           enableZoom
           enablePan={canPanCamera}
