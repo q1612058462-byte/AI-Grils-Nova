@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getSentenceDisplayDuration,
   splitDialogueSentences,
@@ -66,6 +66,8 @@ export default function SceneDialogueOverlay({
   const [displayStyle, setDisplayStyle] = useState<DisplayStyle>("subtitle");
   const [sentenceIndex, setSentenceIndex] = useState(0);
   const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+  const expressionKeyRef = useRef("");
+  const prefetchKeyRef = useRef("");
   const sentences = useMemo(
     () => splitDialogueSentences(dialogue?.text ?? ""),
     [dialogue?.text]
@@ -87,6 +89,8 @@ export default function SceneDialogueOverlay({
 
   useEffect(() => {
     setSentenceIndex(0);
+    expressionKeyRef.current = "";
+    prefetchKeyRef.current = "";
   }, [dialogue?.id]);
 
   useEffect(() => {
@@ -96,10 +100,24 @@ export default function SceneDialogueOverlay({
   useEffect(() => {
     const sentence = sentences[sentenceIndex];
     if (!sentence || isUser) return;
-    onSentenceChange(sentence, sentenceIndex);
+    const expressionKey = `${dialogue?.id ?? "dialogue"}:${sentenceIndex}`;
+    if (expressionKeyRef.current !== expressionKey) {
+      expressionKeyRef.current = expressionKey;
+      onSentenceChange(sentence, sentenceIndex);
+    }
+
     const nextSentence = sentences[sentenceIndex + 1];
-    if (voiceOutputEnabled && nextSentence) onPrefetchSentence(nextSentence);
+    const prefetchKey = `${dialogue?.id ?? "dialogue"}:${sentenceIndex + 1}:${nextSentence ?? ""}`;
+    if (
+      voiceOutputEnabled &&
+      nextSentence &&
+      prefetchKeyRef.current !== prefetchKey
+    ) {
+      prefetchKeyRef.current = prefetchKey;
+      onPrefetchSentence(nextSentence);
+    }
   }, [
+    dialogue?.id,
     isUser,
     onPrefetchSentence,
     onSentenceChange,

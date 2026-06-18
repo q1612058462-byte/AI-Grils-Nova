@@ -648,7 +648,6 @@ export default function AvatarWorkbench() {
               ),
               updatedAt: Date.now(),
             }));
-            setExpression(parsedReply.expression);
 
             if (!firstSentencePrefetched) {
               const firstSentence = splitDialogueSentences(parsedReply.text)[0];
