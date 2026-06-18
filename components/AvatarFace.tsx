@@ -84,7 +84,7 @@ type BoneNodeEntry = {
   node: THREE.Object3D;
 };
 
-type VrmAnimationActions = Partial<Record<AvatarState, THREE.AnimationAction>>;
+type VrmAnimationActions = THREE.AnimationAction[];
 
 type VrmPlaybackRequest = {
   id: number;
@@ -95,7 +95,7 @@ type VrmPlaybackRequest = {
 const CUSTOM_PRESETS_STORAGE_KEY = "avatar.customPosePresets.v1";
 const DEFAULT_CUSTOM_PRESET_NAME = "默认背手2";
 const DEFAULT_REFERENCE_PRESET =
-  REFERENCE_PRESETS.find((preset) => preset.id === "default-welcome") ?? REFERENCE_PRESETS[0];
+  REFERENCE_PRESETS.find((preset) => preset.id === "default-back-hands-2") ?? REFERENCE_PRESETS[0];
 const VRM_VIEWER_MODEL_SCALE = 1.16;
 const VRM_VIEWER_MODEL_POSITION = new THREE.Vector3(0, 0, 0);
 const VRM_VIEWER_CAMERA_POSITION: [number, number, number] = [0, 1.2, 3.6];
@@ -472,7 +472,7 @@ function VRMCharacter({
     attention: 0.35,
   });
   const animationMixerRef = useRef<THREE.AnimationMixer | null>(null);
-  const animationActionsRef = useRef<VrmAnimationActions>({});
+  const animationActionsRef = useRef<VrmAnimationActions>([]);
   const vrmaActionCacheRef = useRef<Map<string, THREE.AnimationAction>>(new Map());
   const activeAnimationActionRef = useRef<THREE.AnimationAction | null>(null);
   const activeAnimationSourceRef = useRef<"state" | "manual" | null>(null);
@@ -677,7 +677,7 @@ function VRMCharacter({
   useEffect(() => {
     animationMixerRef.current?.stopAllAction();
     animationMixerRef.current = null;
-    animationActionsRef.current = {};
+    animationActionsRef.current = [];
     vrmaActionCacheRef.current = new Map();
     activeAnimationActionRef.current = null;
     activeAnimationSourceRef.current = null;
@@ -702,7 +702,7 @@ function VRMCharacter({
           preset.name
         );
         if (action && !cancelled) {
-          animationActionsRef.current[preset.state] = action;
+          animationActionsRef.current.push(action);
         }
       })
     ).then(() => {
@@ -715,7 +715,7 @@ function VRMCharacter({
       cancelled = true;
       mixer.stopAllAction();
       animationMixerRef.current = null;
-      animationActionsRef.current = {};
+      animationActionsRef.current = [];
       vrmaActionCacheRef.current = new Map();
       activeAnimationActionRef.current = null;
       activeAnimationSourceRef.current = null;
@@ -798,7 +798,10 @@ function VRMCharacter({
       activeAnimationActionRef.current !== null &&
       activeAnimationSourceRef.current !== null;
 
-    const stateAction = animationActionsRef.current[state];
+    const stateActions = animationActionsRef.current;
+    const stateAction = stateActions.length
+      ? stateActions[Math.floor(Math.random() * stateActions.length)]
+      : null;
     const now = performance.now() / 1000;
     if (
       stateAction &&
@@ -2013,17 +2016,18 @@ export default function AvatarFace({
               "source" in preset &&
               preset.source === "Custom"
           );
-          setCustomPresets(presets);
-
           const defaultPreset = presets.find(
             (preset) =>
               preset.nameZh === DEFAULT_CUSTOM_PRESET_NAME ||
               preset.nameEn === DEFAULT_CUSTOM_PRESET_NAME
           );
           if (defaultPreset) {
+            setCustomPresets([defaultPreset]);
             setDeskPose(applyReferencePreset(DEFAULT_DESK_POSE, defaultPreset));
             setActivePresetId(defaultPreset.id);
             setPreviewExpression(defaultPreset.expression);
+          } else {
+            setCustomPresets([]);
           }
         }
       }
