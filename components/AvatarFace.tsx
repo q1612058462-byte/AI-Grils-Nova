@@ -2016,19 +2016,13 @@ export default function AvatarFace({
               "source" in preset &&
               preset.source === "Custom"
           );
-          const defaultPreset = presets.find(
-            (preset) =>
-              preset.nameZh === DEFAULT_CUSTOM_PRESET_NAME ||
-              preset.nameEn === DEFAULT_CUSTOM_PRESET_NAME
+          setCustomPresets(
+            presets.filter(
+              (preset) =>
+                preset.nameZh === DEFAULT_CUSTOM_PRESET_NAME ||
+                preset.nameEn === DEFAULT_CUSTOM_PRESET_NAME
+            )
           );
-          if (defaultPreset) {
-            setCustomPresets([defaultPreset]);
-            setDeskPose(applyReferencePreset(DEFAULT_DESK_POSE, defaultPreset));
-            setActivePresetId(defaultPreset.id);
-            setPreviewExpression(defaultPreset.expression);
-          } else {
-            setCustomPresets([]);
-          }
         }
       }
     } catch {

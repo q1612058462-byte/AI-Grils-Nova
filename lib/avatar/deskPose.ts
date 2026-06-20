@@ -47,7 +47,33 @@ export const DEFAULT_WELCOME_POSE: DeskPose = {
   [VRMHumanBoneName.RightThumbMetacarpal]: rotation(-3.0000000000000018, 0, 0),
 };
 
-export const DEFAULT_BACK_HANDS_2_POSE = DEFAULT_WELCOME_POSE;
+export const DEFAULT_BACK_HANDS_2_POSE: DeskPose = {
+  ...DEFAULT_STANDING_POSE,
+  [VRMHumanBoneName.LeftShoulder]: rotation(0, -0.5, 0),
+  [VRMHumanBoneName.LeftUpperArm]: rotation(
+    -17.297840947876637,
+    24.852294861293064,
+    61.0157319452466
+  ),
+  [VRMHumanBoneName.LeftLowerArm]: rotation(
+    -32.341128608727125,
+    -19.978560261297616,
+    55.99999999999999
+  ),
+  [VRMHumanBoneName.LeftHand]: rotation(111.50000000000001, 0, 0),
+  [VRMHumanBoneName.RightUpperArm]: rotation(
+    14.000000000000005,
+    -49.5,
+    -48.00000000000002
+  ),
+  [VRMHumanBoneName.RightLowerArm]: rotation(
+    -22.213884916253743,
+    -50.54635391724469,
+    -37
+  ),
+  [VRMHumanBoneName.RightHand]: rotation(0, 0, -24.5),
+  [VRMHumanBoneName.LeftThumbMetacarpal]: rotation(-2, 0, 0),
+};
 
 export const DEFAULT_DESK_POSE = DEFAULT_BACK_HANDS_2_POSE;
 
