@@ -2252,23 +2252,18 @@ export default function AvatarFace({
         />
         <directionalLight position={[-3, 2.5, 3]} intensity={0.38} color={scenePresetId === "night-loft" ? "#8b5cf6" : "#9ec4d2"} />
         <spotLight position={[0, 4.2, 3]} angle={0.5} penumbra={0.9} intensity={0.55} color={scenePresetId === "night-loft" ? "#93c5fd" : "#ffd4a3"} />
-        {scenePresetId === "cc0-lounge" ? (
-          <Environment
-            files="/assets/hdri/combination_room_1k.hdr"
-            environmentIntensity={0.42}
-          />
-        ) : (
-          <Environment
-            preset={scenePresetId === "night-loft" ? "city" : "apartment"}
-            environmentIntensity={
-              imageBackgroundUrl
+        <Environment
+          files="/assets/hdri/combination_room_1k.hdr"
+          environmentIntensity={
+            scenePresetId === "cc0-lounge"
+              ? 0.42
+              : imageBackgroundUrl
                 ? 0.34
                 : scenePresetId === "soft-studio"
                   ? 0.42
                   : 0.2
-            }
-          />
-        )}
+          }
+        />
         <OrbitControls
           makeDefault
           target={cameraFocusTarget}
