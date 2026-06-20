@@ -11,6 +11,9 @@ type PersistedConversations = {
 
 const dataDirectory = path.join(process.cwd(), ".avatar-data");
 const dataFile = path.join(dataDirectory, "conversations.json");
+const serverFilePersistenceEnabled =
+  process.env.AVATAR_SERVER_CONVERSATION_STORE === "true" &&
+  process.env.VERCEL !== "1";
 
 function isPersistedConversations(value: unknown): value is PersistedConversations {
   return Boolean(
@@ -21,6 +24,13 @@ function isPersistedConversations(value: unknown): value is PersistedConversatio
 }
 
 export async function GET() {
+  if (!serverFilePersistenceEnabled) {
+    return NextResponse.json(
+      { sessions: [], activeSessionId: null, serverPersistence: false },
+      { headers: { "Cache-Control": "no-store" } }
+    );
+  }
+
   try {
     const content = await readFile(dataFile, "utf8");
     const parsed = JSON.parse(content) as unknown;
@@ -49,6 +59,13 @@ export async function PUT(request: Request) {
         { error: "Conversation payload is invalid." },
         { status: 400 }
       );
+    }
+
+    if (!serverFilePersistenceEnabled) {
+      return NextResponse.json({
+        ok: true,
+        serverPersistence: false,
+      });
     }
 
     await mkdir(dataDirectory, { recursive: true });

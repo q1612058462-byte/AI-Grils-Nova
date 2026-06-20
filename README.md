@@ -740,8 +740,30 @@ The project can be deployed to Vercel or any Node.js host capable of running Nex
 For Vercel:
 
 1. Import the GitHub repository.
-2. Add the required environment variables.
-3. Deploy with the default Next.js settings.
+2. Add the required environment variables in **Project Settings -> Environment Variables**.
+3. Deploy with the default Next.js framework preset.
+
+Recommended Vercel variables:
+
+```env
+OPENAI_COMPATIBLE_API_KEY=your-api-key
+OPENAI_COMPATIBLE_BASE_URL=https://api.deepseek.com
+OPENAI_COMPATIBLE_MODEL=deepseek-chat
+NEXT_PUBLIC_USE_MOCK_AVATAR=true
+NEXT_PUBLIC_ENABLE_CAMERA_ROTATION=false
+NEXT_PUBLIC_ENABLE_CAMERA_PAN=false
+NEXT_PUBLIC_ENABLE_POSE_DEBUG=false
+NEXT_PUBLIC_ENABLE_MOTION_LIBRARY=false
+AVATAR_SERVER_CONVERSATION_STORE=false
+```
+
+Vercel serverless functions do not provide durable project-directory file writes. Conversation
+history is therefore stored in the browser by default. Keep `AVATAR_SERVER_CONVERSATION_STORE`
+disabled on Vercel unless you replace it with a real database.
+
+Large static VRM, VRMA, HDRI, and background assets are served from `public/` and cached by Vercel's
+CDN. If you replace assets without changing filenames, clear the deployment cache or rename the
+files.
 
 Do not commit `.env.local` or real API keys.
 

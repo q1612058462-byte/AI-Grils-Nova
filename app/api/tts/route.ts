@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getSpeakableText } from "@/lib/avatar/expressionMapper";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 type TtsSettings = {
   provider?: unknown;

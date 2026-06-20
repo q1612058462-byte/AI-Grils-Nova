@@ -6,6 +6,7 @@ import {
 import { getNoraSystemPrompt } from "@/lib/prompts/noraSystemPrompt";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 type CompatibleMessage = {
   role: "user" | "assistant";
