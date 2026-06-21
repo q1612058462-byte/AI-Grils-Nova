@@ -6,6 +6,10 @@ Nora supports OpenAI-compatible chat APIs, streaming subtitles, browser speech i
 avatar expressions, lip sync, multiple conversations, selectable scenes, and configurable VRM
 characters.
 
+Live production deployment:
+
+- https://avatar-two-drab.vercel.app
+
 ![alt text](image.png)
 ![alt text](image-2.png)
 ![alt text](image-1.png)
@@ -19,7 +23,7 @@ characters.
 - English and Chinese interface
 - 3D, HDRI, PBR, and illustrated background presets
 - Selectable system voices, speech rate, and pitch
-- Runtime model API settings
+- Per-browser model and voice API settings
 - Optional camera rotation, panning, pose debugging, and motion reference tools
 
 ## Project Vision
@@ -63,10 +67,14 @@ experiences, and other applications where the manner of delivery matters as much
 1. Start the application and open it in a modern browser.
 2. Nora appears in the selected scene. The default scene for a new browser profile is
    **Sunset Street**.
-3. Configure an OpenAI-compatible provider through `.env.local`, or open **Settings** in the page
-   and enter a Base URL, model name, and API key.
-4. Type in the dialogue box at the bottom of the scene, then press `Enter` or select **Send**.
-5. Nora's response streams into the scene and is presented one sentence at a time.
+3. On a fresh browser profile, Nora shows a setup prompt before real chat begins.
+4. Select **Open settings** to configure an OpenAI-compatible provider with Base URL, model name,
+   and API key for this browser.
+5. Select **Try demo mode** if you want to experience the scene first. Demo mode uses preset
+   answers, so subtitles, voice playback, expressions, scenes, and session history can be tested
+   without a model API key.
+6. Type in the dialogue box at the bottom of the scene, then press `Enter` or select **Send**.
+7. Nora's response streams into the scene and is presented one sentence at a time.
 
 The current session name and avatar state appear at the top right. The possible states are
 **Idle**, **Listening**, **Thinking**, and **Speaking**.
@@ -250,6 +258,10 @@ Browser-entered API settings are saved in `localStorage`. Chat requests intentio
 server-side model API key, so every browser or device must configure its own provider before real
 model replies are available. If no model is configured, Nora uses preset demo replies so visitors
 can still try subtitles, voice, expressions, scenes, and session history.
+
+This design is intentional for public deployments: the hosted app does not silently spend one
+shared backend API key for every visitor. Each user decides which compatible provider, model, and
+credentials they want to use in their own browser profile.
 
 ### Camera Controls
 
@@ -714,6 +726,11 @@ npm run start
 
 The project can be deployed to Vercel or any Node.js host capable of running Next.js.
 
+Current production deployment:
+
+- Production alias: https://avatar-two-drab.vercel.app
+- Deployment URL: https://avatar-3vfz54yki-nova-1025.vercel.app
+
 For Vercel:
 
 1. Import the GitHub repository.
@@ -734,6 +751,11 @@ AVATAR_SERVER_CONVERSATION_STORE=false
 Model and cloud voice credentials are configured by each visitor inside the browser. The first
 visit shows a setup prompt; visitors can either open Settings or continue in demo mode with preset
 answers.
+
+The deployed app does not require `OPENAI_COMPATIBLE_API_KEY`, `DEEPSEEK_API_KEY`,
+`DOUBAO_TTS_API_KEY`, or `TTS_API_KEY` in Vercel environment variables for normal browser chat and
+voice usage. Those values are collected from the in-scene Settings panels and stored only in the
+visitor's browser.
 
 Vercel serverless functions do not provide durable project-directory file writes. Conversation
 history is therefore stored in the browser by default. Keep `AVATAR_SERVER_CONVERSATION_STORE`
