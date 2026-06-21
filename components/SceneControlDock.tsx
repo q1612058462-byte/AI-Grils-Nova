@@ -31,6 +31,7 @@ type SceneControlDockProps = {
   onBackgroundUpload: (url: string | null) => void;
   modelApiSettings: ModelApiSettings;
   onModelApiSettingsChange: (settings: ModelApiSettings) => void;
+  settingsPanelRequest: number;
   voices: BrowserVoiceOption[];
   voiceSettings: BrowserVoiceSettings;
   onVoiceSettingsChange: (settings: BrowserVoiceSettings) => void;
@@ -63,6 +64,7 @@ export default function SceneControlDock({
   onBackgroundUpload,
   modelApiSettings,
   onModelApiSettingsChange,
+  settingsPanelRequest,
   voices,
   voiceSettings,
   onVoiceSettingsChange,
@@ -73,6 +75,10 @@ export default function SceneControlDock({
   const [panel, setPanel] = useState<Panel>(null);
   const { language, setLanguage } = useUiLanguage();
   const t = (en: string, zh: string) => uiText(language, en, zh);
+
+  useEffect(() => {
+    if (settingsPanelRequest > 0) setPanel("settings");
+  }, [settingsPanelRequest]);
 
   return (
     <>
@@ -286,7 +292,7 @@ function ModelSettingsPanel({
           <input
             value={draft.baseUrl}
             onChange={(event) => update("baseUrl", event.target.value)}
-            placeholder={t("Leave blank to use .env", "留空使用 .env，例如 https://api.deepseek.com")}
+            placeholder={t("Required, e.g. https://api.deepseek.com", "必填，例如 https://api.deepseek.com")}
             className={inputClassName}
           />
         </SettingsField>
@@ -294,7 +300,7 @@ function ModelSettingsPanel({
           <input
             value={draft.model}
             onChange={(event) => update("model", event.target.value)}
-            placeholder={t("Leave blank to use .env", "留空使用 .env")}
+            placeholder={t("Required model name", "必填模型名称")}
             className={inputClassName}
           />
         </SettingsField>
@@ -303,7 +309,7 @@ function ModelSettingsPanel({
             type="password"
             value={draft.apiKey}
             onChange={(event) => update("apiKey", event.target.value)}
-            placeholder={t("Leave blank to use the server key", "留空使用服务端密钥")}
+            placeholder={t("Required in this browser", "当前浏览器必填")}
             autoComplete="off"
             className={inputClassName}
           />
@@ -343,8 +349,8 @@ function ModelSettingsPanel({
       </div>
       <div className="rounded-2xl border border-amber-300/10 bg-amber-300/5 px-4 py-3 text-xs leading-5 text-amber-100/70">
         {t(
-          "The API key entered here is stored only in this browser's localStorage. Use server-side .env on shared devices.",
-          "页面填写的 API Key 仅保存在当前浏览器的 localStorage。公共设备上建议使用服务端 `.env`。"
+          "The API key entered here is stored only in this browser's localStorage. Server-side model keys are intentionally not used for chat, so every browser must configure its own model before real replies.",
+          "页面填写的 API Key 仅保存在当前浏览器的 localStorage。聊天不会使用服务端模型密钥，因此每个浏览器都需要先配置自己的模型。"
         )}
       </div>
       <div className="flex justify-end">

@@ -497,7 +497,7 @@ export function VoiceSettingsPanel({
             <input
               value={settings.cloudBaseUrl}
               onChange={(event) => onChange({ ...settings, cloudBaseUrl: event.target.value })}
-              placeholder={t("Leave blank to use the server setting", "留空使用服务端设置")}
+              placeholder={t("Optional provider endpoint override", "可选：自定义供应商接口地址")}
               className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-slate-100 outline-none placeholder:text-slate-600"
             />
           </label>
@@ -511,8 +511,8 @@ export function VoiceSettingsPanel({
               onChange={(event) => onChange({ ...settings, cloudApiKey: event.target.value })}
               placeholder={
                 settings.cloudProvider === "doubao"
-                  ? t("Leave blank to use DOUBAO_TTS_API_KEY", "留空使用 DOUBAO_TTS_API_KEY")
-                  : t("Leave blank to use TTS_API_KEY", "留空使用 TTS_API_KEY")
+                  ? t("Enter your Doubao API Key", "填写你的豆包 API Key")
+                  : t("Enter your TTS API Key", "填写你的 TTS API Key")
               }
               autoComplete="off"
               className="w-full rounded-lg border border-white/10 bg-slate-900 px-2 py-2 text-slate-100 outline-none placeholder:text-slate-600"

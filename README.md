@@ -164,8 +164,8 @@ reports the problem once and falls back to the system voice for the rest of the 
 Active dialogue is labeled as AI voice output so users know the audio is synthetic.
 
 Voice settings and the speaker on/off state are stored locally in the browser. Cloud credentials
-entered in the page are also stored in browser `localStorage`; use server-side environment
-variables on shared devices. Microsoft Edge often exposes more system voices than other browsers.
+entered in the page are also stored in browser `localStorage`; do not enter personal credentials on
+shared devices. Microsoft Edge often exposes more system voices than other browsers.
 Speech recognition and microphone access work most reliably on `localhost` or an HTTPS deployment.
 
 ### Expressions And Non-Spoken Cues
@@ -238,16 +238,18 @@ Open **Settings** to configure an OpenAI-compatible Chat Completions provider.
 
 | Setting | Purpose |
 | --- | --- |
-| **Base URL** | Provider root URL, such as `https://api.deepseek.com`. Leave blank to use the server environment. |
-| **Model** | Provider model identifier. Leave blank to use the server environment. |
-| **API Key** | Browser-specific override. Leave blank to use the server-side key. |
+| **Base URL** | Required provider root URL, such as `https://api.deepseek.com`. |
+| **Model** | Required provider model identifier. |
+| **API Key** | Required key for this browser profile. |
 | **Temperature** | Controls response variation from focused to more creative output. |
 | **Top P** | Controls nucleus sampling. Most users should adjust either this or temperature, not both aggressively. |
 | **Max Output Tokens** | Limits the maximum generated response length. |
 | **Save** | Stores and applies the current model settings. A check mark confirms the save. |
 
-Browser-entered API settings are saved in `localStorage`. On shared or public devices, configure
-the API key on the server through `.env.local` instead of entering it in the page.
+Browser-entered API settings are saved in `localStorage`. Chat requests intentionally do not use a
+server-side model API key, so every browser or device must configure its own provider before real
+model replies are available. If no model is configured, Nora uses preset demo replies so visitors
+can still try subtitles, voice, expressions, scenes, and session history.
 
 ### Camera Controls
 
@@ -348,19 +350,14 @@ Copy-Item .env.example .env.local
 
 ## Model API Configuration
 
-Configure an OpenAI-compatible Chat Completions endpoint in `.env.local`:
+Configure an OpenAI-compatible Chat Completions endpoint from the in-scene **Settings** panel.
+Nora requires a Base URL, model name, and API key in the current browser before real model replies
+are sent.
 
-```env
-OPENAI_COMPATIBLE_API_KEY=your-api-key
-OPENAI_COMPATIBLE_BASE_URL=https://api.deepseek.com
-OPENAI_COMPATIBLE_MODEL=deepseek-chat
-```
-
-The API key remains on the Next.js server. The in-page settings panel can also override the base
-URL, model, API key, temperature, top-p, and maximum output tokens. Browser overrides are stored in
-localStorage, so server-side environment variables are recommended on shared devices.
-
-Legacy `DEEPSEEK_API_KEY` and `DEEPSEEK_MODEL` variables remain supported as fallbacks.
+The deployment does not read `OPENAI_COMPATIBLE_*` or `DEEPSEEK_*` server variables for chat. This
+keeps a public Vercel deployment from silently sharing one backend model account with every visitor.
+Different browsers, devices, or users can keep separate providers and generation parameters in
+their own `localStorage`.
 
 ## Avatar Configuration
 
@@ -677,45 +674,25 @@ Then restart the server and verify:
 
 ## Voice Support
 
-Natural cloud TTS is configured independently from the chat model. Doubao Speech Synthesis 2.0 is
-the default:
+Natural cloud TTS is configured independently from the chat model in the in-scene **Voice
+Settings** panel. Doubao Speech Synthesis 2.0 is the default provider.
 
-```env
-# Current Volcengine console credential
-DOUBAO_TTS_API_KEY=your-volcengine-api-key
-DOUBAO_TTS_BASE_URL=https://openspeech.bytedance.com/api/v3/tts/unidirectional
-DOUBAO_TTS_RESOURCE_ID=seed-tts-2.0
-DOUBAO_TTS_SPEAKER=your-enabled-speaker-id
-
-# Legacy console alternative
-DOUBAO_TTS_APP_ID=
-DOUBAO_TTS_ACCESS_TOKEN=
-```
-
-The server sends the V3 request with `X-Api-Resource-Id: seed-tts-2.0`, then decodes and combines
-the Base64 audio chunks returned by Volcengine. The configured Speaker ID must already be enabled
-for the account. See the
+The API route receives the browser's TTS settings, sends the V3 request with
+`X-Api-Resource-Id: seed-tts-2.0`, then decodes and combines the Base64 audio chunks returned by
+Volcengine. The configured Speaker ID must already be enabled for the account. See the
 [Doubao Speech Synthesis 2.0 documentation](https://www.volcengine.com/docs/6561/1329505).
 
-An OpenAI-compatible provider remains available:
-
-```env
-TTS_API_KEY=your-tts-provider-key
-TTS_BASE_URL=https://api.openai.com/v1
-TTS_MODEL=gpt-4o-mini-tts
-TTS_VOICE=marin
-TTS_INSTRUCTIONS=Speak naturally in a warm, gentle, conversational tone.
-```
-
-For the OpenAI-compatible provider, the server appends `/audio/speech` unless the configured URL
-already ends with that path. The in-page Voice Settings panel can override the provider, Base URL,
-credentials, resource/model, voice, and speed for the current browser.
+An OpenAI-compatible `/audio/speech` provider remains available. For that provider, the server
+appends `/audio/speech` unless the configured URL already ends with that path. The in-page Voice
+Settings panel controls the provider, Base URL, credentials, resource/model, voice, and speed for
+the current browser.
 
 - Cloud TTS audio is generated and played sentence by sentence.
 - Doubao supports both current API Key authentication and legacy App ID + Access Token
   authentication.
 - Doubao UI speed is converted to the V3 `speech_rate` range.
-- `TTS_API_KEY` falls back to `OPENAI_API_KEY` when omitted.
+- If cloud voice is not configured in the browser, Nora uses the browser system voice without
+  sending a cloud TTS request.
 - Older `tts-1` models automatically omit unsupported speaking-style instructions.
 - Browser `speechSynthesis` remains available as a fallback.
 - Speech recognition continues to use the browser Web Speech API.
@@ -740,15 +717,12 @@ The project can be deployed to Vercel or any Node.js host capable of running Nex
 For Vercel:
 
 1. Import the GitHub repository.
-2. Add the required environment variables in **Project Settings -> Environment Variables**.
+2. Add only the public deployment/debug variables you need in **Project Settings -> Environment Variables**.
 3. Deploy with the default Next.js framework preset.
 
 Recommended Vercel variables:
 
 ```env
-OPENAI_COMPATIBLE_API_KEY=your-api-key
-OPENAI_COMPATIBLE_BASE_URL=https://api.deepseek.com
-OPENAI_COMPATIBLE_MODEL=deepseek-chat
 NEXT_PUBLIC_USE_MOCK_AVATAR=true
 NEXT_PUBLIC_ENABLE_CAMERA_ROTATION=false
 NEXT_PUBLIC_ENABLE_CAMERA_PAN=false
@@ -756,6 +730,10 @@ NEXT_PUBLIC_ENABLE_POSE_DEBUG=false
 NEXT_PUBLIC_ENABLE_MOTION_LIBRARY=false
 AVATAR_SERVER_CONVERSATION_STORE=false
 ```
+
+Model and cloud voice credentials are configured by each visitor inside the browser. The first
+visit shows a setup prompt; visitors can either open Settings or continue in demo mode with preset
+answers.
 
 Vercel serverless functions do not provide durable project-directory file writes. Conversation
 history is therefore stored in the browser by default. Keep `AVATAR_SERVER_CONVERSATION_STORE`

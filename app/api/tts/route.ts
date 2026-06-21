@@ -67,35 +67,19 @@ async function createOpenAiSpeech(
   text: string,
   settings: TtsSettings
 ) {
-  const apiKey =
-    getString(settings.apiKey, "") ||
-    process.env.TTS_API_KEY ||
-    process.env.OPENAI_API_KEY;
-  const baseUrl = getString(
-    settings.baseUrl,
-    process.env.TTS_BASE_URL || "https://api.openai.com/v1",
-    2048
-  );
-  const model = getString(
-    settings.model,
-    process.env.TTS_MODEL || "gpt-4o-mini-tts",
-    128
-  );
-  const voice = getString(
-    settings.voice,
-    process.env.TTS_VOICE || "marin",
-    128
-  );
+  const apiKey = getString(settings.apiKey, "");
+  const baseUrl = getString(settings.baseUrl, "https://api.openai.com/v1", 2048);
+  const model = getString(settings.model, "gpt-4o-mini-tts", 128);
+  const voice = getString(settings.voice, "marin", 128);
   const instructions = getString(
     settings.instructions,
-    process.env.TTS_INSTRUCTIONS ||
-      "Speak naturally in a warm, gentle, conversational tone. Use expressive but restrained intonation and clear pauses.",
+    "Speak naturally in a warm, gentle, conversational tone. Use expressive but restrained intonation and clear pauses.",
     4096
   );
 
   if (!apiKey) {
     return NextResponse.json(
-      { error: "OpenAI-compatible TTS is not configured. Add TTS_API_KEY." },
+      { error: "OpenAI-compatible TTS is not configured in this browser." },
       { status: 503 }
     );
   }
@@ -147,39 +131,22 @@ async function createDoubaoSpeech(
   text: string,
   settings: TtsSettings
 ) {
-  const apiKey =
-    getString(settings.apiKey, "") ||
-    process.env.DOUBAO_TTS_API_KEY;
-  const appId =
-    getString(settings.appId, "") ||
-    process.env.DOUBAO_TTS_APP_ID ||
-    "";
-  const accessToken =
-    getString(settings.accessToken, "") ||
-    process.env.DOUBAO_TTS_ACCESS_TOKEN ||
-    "";
+  const apiKey = getString(settings.apiKey, "");
+  const appId = getString(settings.appId, "");
+  const accessToken = getString(settings.accessToken, "");
   const baseUrl = getString(
     settings.baseUrl,
-    process.env.DOUBAO_TTS_BASE_URL ||
-      "https://openspeech.bytedance.com/api/v3/tts/unidirectional",
+    "https://openspeech.bytedance.com/api/v3/tts/unidirectional",
     2048
   );
-  const resourceId = getString(
-    settings.resourceId,
-    process.env.DOUBAO_TTS_RESOURCE_ID || "seed-tts-2.0",
-    128
-  );
-  const speaker = getString(
-    settings.voice,
-    process.env.DOUBAO_TTS_SPEAKER || "zh_female_vv_uranus_bigtts",
-    256
-  );
+  const resourceId = getString(settings.resourceId, "seed-tts-2.0", 128);
+  const speaker = getString(settings.voice, "zh_female_vv_uranus_bigtts", 256);
 
   if (!apiKey && !(appId && accessToken)) {
     return NextResponse.json(
       {
         error:
-          "Doubao TTS is not configured. Add DOUBAO_TTS_API_KEY, or use DOUBAO_TTS_APP_ID with DOUBAO_TTS_ACCESS_TOKEN.",
+          "Doubao TTS is not configured in this browser. Add a Doubao API Key, or use App ID with Access Token.",
       },
       { status: 503 }
     );

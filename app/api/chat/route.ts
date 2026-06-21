@@ -40,27 +40,15 @@ export async function POST(request: Request) {
       ? body.messages.filter(isCompatibleMessage).slice(-24)
       : [];
     const clientSettings = normalizeModelApiSettings(body.apiSettings ?? {});
-    const apiKey =
-      clientSettings.apiKey ||
-      process.env.OPENAI_COMPATIBLE_API_KEY ||
-      process.env.DEEPSEEK_API_KEY;
-    const baseUrl =
-      clientSettings.baseUrl ||
-      process.env.OPENAI_COMPATIBLE_BASE_URL ||
-      "https://api.deepseek.com";
-    const model =
-      clientSettings.model ||
-      process.env.OPENAI_COMPATIBLE_MODEL ||
-      process.env.DEEPSEEK_MODEL ||
-      "deepseek-v4-flash";
+    const { apiKey, baseUrl, model } = clientSettings;
 
-    if (!apiKey) {
+    if (!apiKey || !baseUrl || !model) {
       return NextResponse.json(
         {
           error:
-            "API Key 未配置。请在页面设置或 .env.local 中填写。",
+            "Model settings are missing. Configure Base URL, Model, and API Key in this browser.",
         },
-        { status: 500 }
+        { status: 400 }
       );
     }
 
@@ -68,7 +56,7 @@ export async function POST(request: Request) {
     try {
       parsedBaseUrl = new URL(baseUrl);
     } catch {
-      return NextResponse.json({ error: "Base URL 格式无效。" }, { status: 400 });
+      return NextResponse.json({ error: "Base URL is invalid." }, { status: 400 });
     }
     const isLocalHttp =
       parsedBaseUrl.protocol === "http:" &&
@@ -76,7 +64,7 @@ export async function POST(request: Request) {
         parsedBaseUrl.hostname === "127.0.0.1");
     if (parsedBaseUrl.protocol !== "https:" && !isLocalHttp) {
       return NextResponse.json(
-        { error: "Base URL 必须使用 HTTPS，本地开发可使用 localhost。" },
+        { error: "Base URL must use HTTPS, except for localhost development." },
         { status: 400 }
       );
     }

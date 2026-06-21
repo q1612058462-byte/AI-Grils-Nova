@@ -124,6 +124,35 @@ function getConversationTitle(prompt: string) {
   return normalized.length > 18 ? `${normalized.slice(0, 18)}...` : normalized;
 }
 
+function hasBrowserModelConfig(settings: ModelApiSettings) {
+  return Boolean(
+    settings.baseUrl.trim() &&
+    settings.model.trim() &&
+    settings.apiKey.trim()
+  );
+}
+
+function hasBrowserCloudVoiceConfig(settings: BrowserVoiceSettings) {
+  if (settings.engine !== "cloud") return false;
+  if (settings.cloudApiKey.trim()) return true;
+  return settings.cloudProvider === "doubao" &&
+    Boolean(settings.doubaoAppId.trim() && settings.doubaoAccessToken.trim());
+}
+
+function getDemoReply(prompt: string) {
+  const lowerPrompt = prompt.toLowerCase();
+  if (/hello|hi|\u4f60\u597d|\u55e8|\u5728\u5417/.test(lowerPrompt)) {
+    return "[expression:happy] Hello, I'm Nora. This is demo mode, so I can show the scene, subtitles, voice, and expressions before you connect a model API. Open Settings when you are ready to add your own model.";
+  }
+  if (/help|\u529f\u80fd|\u600e\u4e48\u7528|guide|what can/.test(lowerPrompt)) {
+    return "[expression:smile] You can type in the subtitle panel, switch between manual and automatic dialogue playback, choose a scene, change the avatar, and manage sessions. After you add an OpenAI-compatible model in Settings, Nora will answer with your selected provider.";
+  }
+  if (/\u96be\u8fc7|\u7126\u8651|\u7d2f|sad|anxious|tired|\u5b89\u6170/.test(lowerPrompt)) {
+    return "[expression:comfort] I hear you. Let's make this moment smaller and easier to hold. Take one slow breath first, then tell me only the next tiny thing you need help with.";
+  }
+  return "[expression:smile] This is a preset demo answer because this browser has not configured a model API yet. You can still test subtitles, sentence-by-sentence playback, voice fallback, expressions, scenes, and session history. To unlock real replies, open Settings and add Base URL, Model, and API Key.";
+}
+
 export default function AvatarWorkbench() {
   const initialConversation = useMemo(() => createConversation(), []);
   const [state, setState] = useState<AvatarState>("idle");
@@ -144,6 +173,8 @@ export default function AvatarWorkbench() {
   const [customBackgroundUrl, setCustomBackgroundUrl] = useState<string | null>(null);
   const [modelApiSettings, setModelApiSettings] = useState(DEFAULT_MODEL_API_SETTINGS);
   const [uiLanguage, setUiLanguage] = useState<UiLanguage>("en");
+  const [showInitialSetupPrompt, setShowInitialSetupPrompt] = useState(false);
+  const [settingsPanelRequest, setSettingsPanelRequest] = useState(0);
 
   const lipSyncStopRef = useRef<(() => void) | null>(null);
   const modelAbortRef = useRef<AbortController | null>(null);
@@ -279,16 +310,20 @@ export default function AvatarWorkbench() {
       }
     }
 
+    let restoredModelSettings = DEFAULT_MODEL_API_SETTINGS;
     const storedModelSettings = window.localStorage.getItem(MODEL_API_SETTINGS_STORAGE_KEY);
     if (storedModelSettings) {
       try {
-        setModelApiSettings(
-          normalizeModelApiSettings(JSON.parse(storedModelSettings) as Partial<ModelApiSettings>)
+        restoredModelSettings = normalizeModelApiSettings(
+          JSON.parse(storedModelSettings) as Partial<ModelApiSettings>
         );
+        setModelApiSettings(restoredModelSettings);
       } catch {
         window.localStorage.removeItem(MODEL_API_SETTINGS_STORAGE_KEY);
       }
     }
+    setShowInitialSetupPrompt(!hasBrowserModelConfig(restoredModelSettings));
+
     const storedLanguage = window.localStorage.getItem(UI_LANGUAGE_STORAGE_KEY);
     if (storedLanguage === "en" || storedLanguage === "zh") {
       setUiLanguage(storedLanguage);
@@ -571,7 +606,11 @@ export default function AvatarWorkbench() {
       },
     };
 
-    if (voiceSettings.engine === "cloud" && !cloudTtsUnavailableRef.current) {
+    if (
+      voiceSettings.engine === "cloud" &&
+      hasBrowserCloudVoiceConfig(voiceSettings) &&
+      !cloudTtsUnavailableRef.current
+    ) {
       const cloudPlayback = speakWithCloud(speakableText, voiceSettings, playbackHandlers);
       speechCancelRef.current = cloudPlayback.cancel;
 
@@ -609,6 +648,7 @@ export default function AvatarWorkbench() {
 
   const prefetchSentence = useCallback((text: string) => {
     if (cloudTtsUnavailableRef.current) return;
+    if (!hasBrowserCloudVoiceConfig(voiceSettings)) return;
     const speakableText = getSpeakableText(text);
     if (speakableText) prefetchCloudSpeech(speakableText, voiceSettings);
   }, [voiceSettings]);
@@ -670,6 +710,25 @@ export default function AvatarWorkbench() {
     setIsModelLoading(true);
     setState("thinking");
     setExpression("serious");
+
+    if (!hasBrowserModelConfig(modelApiSettings)) {
+      const finalReply = parseAvatarResponse(getDemoReply(prompt), "comfort");
+      window.setTimeout(() => {
+        updateSession(targetSession.id, (session) => ({
+          ...session,
+          messages: session.messages.map((entry) =>
+            entry.id === assistantId ? { ...entry, text: finalReply.text } : entry
+          ),
+          updatedAt: Date.now(),
+        }));
+        setExpression(finalReply.expression);
+        const firstSentence = splitDialogueSentences(finalReply.text)[0];
+        if (firstSentence) prefetchSentence(firstSentence);
+        setState("idle");
+        setIsModelLoading(false);
+      }, 350);
+      return;
+    }
 
     const controller = new AbortController();
     modelAbortRef.current = controller;
@@ -816,6 +875,9 @@ export default function AvatarWorkbench() {
       MODEL_API_SETTINGS_STORAGE_KEY,
       JSON.stringify(normalized)
     );
+    if (hasBrowserModelConfig(normalized)) {
+      setShowInitialSetupPrompt(false);
+    }
   }, []);
   const updateUiLanguage = useCallback((language: UiLanguage) => {
     setUiLanguage(language);
@@ -873,7 +935,46 @@ export default function AvatarWorkbench() {
         onBackgroundUpload={updateUploadedBackground}
         modelApiSettings={modelApiSettings}
         onModelApiSettingsChange={updateModelApiSettings}
+        settingsPanelRequest={settingsPanelRequest}
       />
+
+      {showInitialSetupPrompt ? (
+        <div className="absolute inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md">
+          <section className="w-full max-w-lg rounded-3xl border border-cyan-300/20 bg-slate-950/95 p-6 text-slate-100 shadow-2xl">
+            <div className="mb-4 inline-flex rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-cyan-100">
+              Browser setup
+            </div>
+            <h2 className="text-xl font-semibold text-white">
+              Configure this browser before real chat
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-slate-300">
+              Model and voice API settings are stored only in this browser.
+              Every browser or device must add its own Base URL, model, API key,
+              and voice credentials. If you skip setup, Nora will use preset demo
+              replies so you can still experience the scene, subtitles, voice, and expressions.
+            </p>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => {
+                  setSettingsPanelRequest((current) => current + 1);
+                  setShowInitialSetupPrompt(false);
+                }}
+                className="rounded-2xl border border-cyan-300/30 bg-cyan-400/15 px-4 py-3 text-sm font-medium text-cyan-50 hover:bg-cyan-400/25"
+              >
+                Open settings
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowInitialSetupPrompt(false)}
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200 hover:bg-white/10"
+              >
+                Try demo mode
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {error ? (
         <button

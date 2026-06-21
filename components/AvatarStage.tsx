@@ -56,6 +56,7 @@ type AvatarStageProps = {
   onBackgroundUpload: (url: string | null) => void;
   modelApiSettings: ModelApiSettings;
   onModelApiSettingsChange: (settings: ModelApiSettings) => void;
+  settingsPanelRequest: number;
 };
 
 export default function AvatarStage({
@@ -97,6 +98,7 @@ export default function AvatarStage({
   onBackgroundUpload,
   modelApiSettings,
   onModelApiSettingsChange,
+  settingsPanelRequest,
 }: AvatarStageProps) {
   const normalizedMouth = blendMouthOpen(state, mouthOpen);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -138,6 +140,7 @@ export default function AvatarStage({
           onBackgroundUpload={onBackgroundUpload}
           modelApiSettings={modelApiSettings}
           onModelApiSettingsChange={onModelApiSettingsChange}
+          settingsPanelRequest={settingsPanelRequest}
           voices={voices}
           voiceSettings={voiceSettings}
           onVoiceSettingsChange={onVoiceSettingsChange}
