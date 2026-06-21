@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { VoiceSettingsPanel } from "@/components/SceneDialogueOverlay";
 import {
   AVATAR_PRESETS,
   SCENE_PRESETS,
   type ScenePresetId,
 } from "@/lib/avatar/appearanceLibrary";
 import type { ModelApiSettings } from "@/lib/model/modelApiSettings";
+import type { BrowserVoiceOption, BrowserVoiceSettings } from "@/lib/voice/browserSpeech";
 import { uiText, useUiLanguage } from "@/lib/i18n/uiLanguage";
 import type { AvatarConversation, AvatarState } from "@/types/avatar";
 
-type Panel = "appearance" | "settings" | "sessions" | "about" | null;
+type Panel = "appearance" | "settings" | "sessions" | "guide" | "about" | null;
 
 type SceneControlDockProps = {
   state: AvatarState;
@@ -29,6 +31,10 @@ type SceneControlDockProps = {
   onBackgroundUpload: (url: string | null) => void;
   modelApiSettings: ModelApiSettings;
   onModelApiSettingsChange: (settings: ModelApiSettings) => void;
+  voices: BrowserVoiceOption[];
+  voiceSettings: BrowserVoiceSettings;
+  onVoiceSettingsChange: (settings: BrowserVoiceSettings) => void;
+  onVoicePreview: () => void;
   historyOpen: boolean;
   onHistoryToggle: () => void;
 };
@@ -57,6 +63,10 @@ export default function SceneControlDock({
   onBackgroundUpload,
   modelApiSettings,
   onModelApiSettingsChange,
+  voices,
+  voiceSettings,
+  onVoiceSettingsChange,
+  onVoicePreview,
   historyOpen,
   onHistoryToggle,
 }: SceneControlDockProps) {
@@ -78,6 +88,9 @@ export default function SceneControlDock({
         </DockButton>
         <DockButton label={t("Settings", "设置")} onClick={() => setPanel("settings")}>
           <SettingsIcon />
+        </DockButton>
+        <DockButton label={t("Guide", "使用文档")} onClick={() => setPanel("guide")}>
+          <GuideIcon />
         </DockButton>
         <DockButton label={t("Sessions", "会话")} onClick={() => setPanel("sessions")}>
           <ChatIcon />
@@ -117,6 +130,8 @@ export default function SceneControlDock({
                     ? t("Scene & avatar", "场景与角色")
                     : panel === "settings"
                       ? t("Settings", "设置")
+                    : panel === "guide"
+                      ? t("User guide", "使用文档")
                     : panel === "sessions"
                       ? t("Session management", "会话管理")
                       : t("About", "关于页面")}
@@ -126,6 +141,8 @@ export default function SceneControlDock({
                     ? t("Choose a scene or VRM avatar.", "选择场景风格或切换 VRM 角色。")
                     : panel === "settings"
                       ? t("Configure the model API and generation parameters.", "配置模型 API 与生成参数。")
+                    : panel === "guide"
+                      ? t("How to use Nora and where your data is stored.", "了解如何使用 Nora，以及数据保存在哪里。")
                     : panel === "sessions"
                     ? t("Each session has independent context and subtitles.", "每个会话拥有独立上下文和字幕记录。")
                     : t("Nora digital avatar scene", "Nora 数字人对话场景")}
@@ -152,10 +169,16 @@ export default function SceneControlDock({
                   onBackgroundUpload={onBackgroundUpload}
                 />
               ) : panel === "settings" ? (
-                <ModelSettingsPanel
-                  settings={modelApiSettings}
-                  onSave={onModelApiSettingsChange}
+                <UserSettingsPanel
+                  modelSettings={modelApiSettings}
+                  onModelSave={onModelApiSettingsChange}
+                  voices={voices}
+                  voiceSettings={voiceSettings}
+                  onVoiceSettingsChange={onVoiceSettingsChange}
+                  onVoicePreview={onVoicePreview}
                 />
+              ) : panel === "guide" ? (
+                <GuidePanel />
               ) : panel === "sessions" ? (
                 <SessionManager
                   sessions={sessions}
@@ -177,6 +200,53 @@ export default function SceneControlDock({
         </div>
       ) : null}
     </>
+  );
+}
+
+function UserSettingsPanel({
+  modelSettings,
+  onModelSave,
+  voices,
+  voiceSettings,
+  onVoiceSettingsChange,
+  onVoicePreview,
+}: {
+  modelSettings: ModelApiSettings;
+  onModelSave: (settings: ModelApiSettings) => void;
+  voices: BrowserVoiceOption[];
+  voiceSettings: BrowserVoiceSettings;
+  onVoiceSettingsChange: (settings: BrowserVoiceSettings) => void;
+  onVoicePreview: () => void;
+}) {
+  const { language } = useUiLanguage();
+  const t = (en: string, zh: string) => uiText(language, en, zh);
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+        <h3 className="mb-3 text-sm font-medium text-white">
+          {t("Model API", "模型 API")}
+        </h3>
+        <ModelSettingsPanel settings={modelSettings} onSave={onModelSave} />
+      </section>
+      <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+        <h3 className="mb-3 text-sm font-medium text-white">
+          {t("Voice and TTS", "声音与语音")}
+        </h3>
+        <VoiceSettingsPanel
+          voices={voices}
+          settings={voiceSettings}
+          onChange={onVoiceSettingsChange}
+          onPreview={onVoicePreview}
+        />
+      </section>
+      <p className="rounded-2xl border border-cyan-300/10 bg-cyan-300/5 px-4 py-3 text-xs leading-5 text-cyan-100/75">
+        {t(
+          "These model and voice settings are saved only in this browser. Different users can keep different API keys, models, voices, speed, and pitch without changing the deployment.",
+          "这些模型和声音设置只保存在当前浏览器。不同用户可以各自保存 API Key、模型、音色、语速和音高，不需要修改部署配置。"
+        )}
+      </p>
+    </div>
   );
 }
 
@@ -585,6 +655,77 @@ function AboutPanel() {
   );
 }
 
+function GuidePanel() {
+  const { language } = useUiLanguage();
+  const t = (en: string, zh: string) => uiText(language, en, zh);
+  const items = [
+    [
+      t("Scene & Avatar", "场景与角色"),
+      t(
+        "Choose a background, upload a temporary image, switch VRM avatars, or upload a local VRM preview.",
+        "选择背景、临时上传图片、切换 VRM 角色，或上传本地 VRM 进行预览。"
+      ),
+    ],
+    [
+      t("User Settings", "用户设置"),
+      t(
+        "Configure the OpenAI-compatible chat model and the TTS voice. These values are stored in this browser's localStorage.",
+        "配置 OpenAI 兼容聊天模型和 TTS 声音。这些值保存在当前浏览器的 localStorage。"
+      ),
+    ],
+    [
+      t("Sessions", "会话"),
+      t(
+        "Create separate conversations. Each session keeps its own context and subtitle history.",
+        "创建独立会话。每个会话都有自己的上下文和字幕历史。"
+      ),
+    ],
+    [
+      t("History Drawer", "历史抽屉"),
+      t(
+        "Open the right-side drawer to review the full conversation while continuing to type.",
+        "打开右侧抽屉查看完整对话，同时可以继续输入。"
+      ),
+    ],
+    [
+      t("Voice Controls", "语音控制"),
+      t(
+        "Use the microphone for speech input, toggle speech playback, and preview voice settings before chatting.",
+        "使用麦克风语音输入，开关语音播放，并在聊天前试听声音设置。"
+      ),
+    ],
+    [
+      t("Privacy", "隐私"),
+      t(
+        "Browser overrides, voice settings, session history, and uploaded temporary files stay in the current browser. Server-side .env variables remain the safer default for shared deployments.",
+        "浏览器覆盖配置、声音设置、会话历史和临时上传文件都留在当前浏览器。共享部署时，服务端 .env 仍是更安全的默认方式。"
+      ),
+    ],
+  ] as const;
+
+  return (
+    <div className="space-y-4 text-sm leading-6 text-slate-300">
+      <div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/5 p-4">
+        <h3 className="font-medium text-cyan-100">{t("Quick Start", "快速开始")}</h3>
+        <p className="mt-2">
+          {t(
+            "Open User Settings, enter your model provider, choose a voice, then send a message in the subtitle box. Nora will answer sentence by sentence in the scene.",
+            "打开用户设置，填写模型服务，选择声音，然后在字幕框里发送消息。Nora 会在场景里逐句回应。"
+          )}
+        </p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {items.map(([title, body]) => (
+          <section key={title} className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+            <h3 className="font-medium text-white">{title}</h3>
+            <p className="mt-2 text-xs leading-5 text-slate-400">{body}</p>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DockButton({
   label,
   onClick,
@@ -689,6 +830,10 @@ function HistoryIcon() {
 
 function InfoIcon() {
   return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5h.01" /></svg>;
+}
+
+function GuideIcon() {
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 4.5h10a4 4 0 0 1 4 4v11H9a4 4 0 0 0-4-4v-11Z" /><path d="M5 15.5V4.5M9 8h6M9 11h6" /></svg>;
 }
 
 function CloseIcon() {

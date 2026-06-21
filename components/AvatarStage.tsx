@@ -138,6 +138,12 @@ export default function AvatarStage({
           onBackgroundUpload={onBackgroundUpload}
           modelApiSettings={modelApiSettings}
           onModelApiSettingsChange={onModelApiSettingsChange}
+          voices={voices}
+          voiceSettings={voiceSettings}
+          onVoiceSettingsChange={onVoiceSettingsChange}
+          onVoicePreview={() => {
+            void onSpeakSentence(t("This is a voice preview.", "这是一句语音试听。"));
+          }}
           historyOpen={historyOpen}
           onHistoryToggle={() => setHistoryOpen((current) => !current)}
         />

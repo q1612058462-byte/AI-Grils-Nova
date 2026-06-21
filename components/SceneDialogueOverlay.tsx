@@ -439,7 +439,7 @@ export default function SceneDialogueOverlay({
   );
 }
 
-function VoiceSettingsPanel({
+export function VoiceSettingsPanel({
   voices,
   settings,
   onChange,
